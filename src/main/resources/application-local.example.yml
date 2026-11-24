@@ -1,0 +1,3 @@
+spring:
+  datasource:
+    password: your-mysql-root-password
