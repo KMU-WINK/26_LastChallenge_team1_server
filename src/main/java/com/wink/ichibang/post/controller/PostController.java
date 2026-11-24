@@ -1,45 +1,48 @@
 package com.wink.ichibang.post.controller;
 
+import com.wink.ichibang.post.domain.PostType;
+import com.wink.ichibang.post.dto.ApiResponse;
+import com.wink.ichibang.post.dto.response.PageResponse;
 import com.wink.ichibang.post.dto.response.PostDetailResponse;
-import com.wink.ichibang.post.dto.response.PostPageResponse;
-import com.wink.ichibang.post.dto.response.PostSummaryResponse;
+import com.wink.ichibang.post.dto.response.PostListItemResponse;
 import com.wink.ichibang.post.service.PostService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 부원용. 누구나(비로그인 포함) 호출 가능 */
-@Validated
+/** 부원·비로그인용 (COM-01: 누구나 접근) */
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/api/posts")
+@RequiredArgsConstructor
 public class PostController {
 
     private final PostService postService;
 
-    /**
-     * POST-04 부원 목록.
-     * 예: /api/posts?openOnly=true&page=0&size=10
-     *
-     * @param openOnly "모집 중인 게시글만 보기" 토글
-     */
+    /** POST-04 신청글 목록 */
     @GetMapping
-    public PostPageResponse<PostSummaryResponse> getPosts(
-            @RequestParam(defaultValue = "false") boolean openOnly,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size) {
-        return postService.getPosts(openOnly, page, size);
+    public ApiResponse<PageResponse<PostListItemResponse>> getPosts(
+            @RequestParam(defaultValue = "false") boolean recruiting,
+            @RequestParam(required = false) PostType type,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이에요") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "size는 1~100이에요")
+            @Max(value = 100, message = "size는 1~100이에요") int size) {
+        return ApiResponse.of(postService.getPosts(recruiting, type, page, size));
     }
 
-    /** POST-05 부원 상세 */
+    /**
+     * POST-05 신청글 상세.
+     * TODO(인증): 로그인 연동 전까지 X-Member-Id 헤더로 부원을 흉내 낸다. 헤더가 없으면 비로그인.
+     */
     @GetMapping("/{postId}")
-    public PostDetailResponse getPost(@PathVariable Long postId) {
-        return postService.getPost(postId);
+    public ApiResponse<PostDetailResponse> getPost(
+            @PathVariable Long postId,
+            @RequestHeader(value = "X-Member-Id", required = false) Long memberId) {
+        return ApiResponse.of(postService.getPost(postId, memberId));
     }
 }

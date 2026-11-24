@@ -1,68 +1,61 @@
 package com.wink.ichibang.post.service;
 
-import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.post.domain.PostStatus;
+import com.wink.ichibang.post.domain.PostType;
+import com.wink.ichibang.post.dto.response.PageResponse;
 import com.wink.ichibang.post.dto.response.PostDetailResponse;
-import com.wink.ichibang.post.dto.response.PostPageResponse;
-import com.wink.ichibang.post.dto.response.PostSummaryResponse;
+import com.wink.ichibang.post.dto.response.PostListItemResponse;
 import com.wink.ichibang.post.exception.PostErrorCode;
 import com.wink.ichibang.post.exception.PostException;
+import com.wink.ichibang.post.port.SubmissionPort;
 import com.wink.ichibang.post.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
-/** 부원·비회원용 조회 (POST-04, POST-05) + 제출 담당에게 제공하는 메서드 */
+/** 부원·비로그인용 신청글 조회 (POST-04, POST-05) */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PostService {
 
     private final PostRepository postRepository;
+    private final SubmissionPort submissionPort;
 
-    /** POST-04 부원 목록. openOnly=true면 모집 중인 글만 */
-    public PostPageResponse<PostSummaryResponse> getPosts(boolean openOnly, int page, int size) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-
-        Page<Post> posts = openOnly
-                ? postRepository.findOpen(now, pageable)
-                : postRepository.findVisible(now, pageable);
-
-        return PostPageResponse.from(posts.map(post -> PostSummaryResponse.of(post, now)));
+    /** POST-04. 시작 전·삭제 글 제외, 마감 글 포함, 최신순 */
+    public PageResponse<PostListItemResponse> getPosts(boolean recruiting, PostType type, int page, int size) {
+        LocalDate today = today();
+        Page<Post> posts = postRepository.findForMember(
+                today, type, recruiting, PostStatus.OPEN, latestFirst(page, size));
+        return PageResponse.of(posts, (post, no) -> PostListItemResponse.of(post, no, today));
     }
 
-    /** POST-05 부원 상세. 모집 전·삭제된 글은 404 */
-    public PostDetailResponse getPost(Long postId) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
-        return PostDetailResponse.of(getVisiblePost(postId, now), now);
-    }
-
-    // ===== 제출 담당에게 제공 =====
-
-    /** 지금 신청할 수 있는 신청글인가 */
-    public boolean isSubmittable(Long postId) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
-        return postRepository.findById(postId)
-                .map(post -> post.isSubmittable(now))
-                .orElse(false);
-    }
-
-    /** 부원에게 보이는 신청글의 현재 상태. 안 보이는 글이면 POST_NOT_FOUND */
-    public DisplayStatus getDisplayStatus(Long postId) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
-        return getVisiblePost(postId, now).displayStatus(now);
-    }
-
-    private Post getVisiblePost(Long postId, LocalDateTime now) {
-        return postRepository.findById(postId)
-                .filter(post -> post.isVisible(now))
+    /**
+     * POST-05. 시작 전·삭제 글은 404.
+     * @param memberId 로그인한 부원 ID, 비로그인이면 null → mySubmission null
+     */
+    public PostDetailResponse getPost(Long postId, Long memberId) {
+        LocalDate today = today();
+        Post post = postRepository.findById(postId)
+                .filter(p -> p.isStartedOn(today))
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
+
+        SubmissionPort.MySubmission mySubmission = memberId == null ? null
+                : submissionPort.findMySubmission(postId, memberId).orElse(null);
+        return PostDetailResponse.of(post, today, mySubmission);
+    }
+
+    static PageRequest latestFirst(int page, int size) {
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+    }
+
+    static LocalDate today() {
+        return LocalDate.now(Post.KST);
     }
 }
