@@ -1,23 +1,32 @@
 package com.wink.ichibang.post.dto.request;
 
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.List;
 
 /**
- * 신청글 수정. 보낸(null이 아닌) 필드만 바꾼다.
- * 상태별 수정 가능 여부는 Post 엔티티에서 검사한다.
+ * POST-02 신청글·신청서 수정. 보낸(null이 아닌) 항목만 바꾼다.
+ * questions를 보내면 기존 질문 전체를 새 목록으로 교체한다.
+ * summary에 빈 문자열을 보내면 한 줄 소개를 지운다.
  */
 public record PostUpdateRequest(
+
         @Size(max = 100)
         String title,
 
         @Size(max = 100)
         String summary,
 
-        LocalDateTime opensAt,
+        @Size(max = 5000)
+        String description,
 
-        LocalDateTime closesAt
+        LocalDate opensOn,
+
+        LocalDate closesOn,
+
+        @Valid
+        List<QuestionRequest> questions
 ) {
 }

@@ -1,18 +1,19 @@
 package com.wink.ichibang.post.dto.response;
 
+import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
-import com.wink.ichibang.post.domain.PostStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/** 공개 목록의 한 줄: 번호, 구분, 제목, 한 줄 설명, 신청 기간, 상태, D-day */
+/** 부원 목록의 한 줄 (POST-04): 번호, 제목, D-day, 한 줄 소개, 신청 기간, 상태 */
 public record PostSummaryResponse(
         Long postId,
         String title,
         String summary,
-        LocalDateTime opensAt,
-        LocalDateTime closesAt,
-        PostStatus status,
+        LocalDate opensOn,
+        LocalDate closesOn,
+        DisplayStatus status,
         Integer dDay
 ) {
     public static PostSummaryResponse of(Post post, LocalDateTime now) {
@@ -20,9 +21,9 @@ public record PostSummaryResponse(
                 post.getId(),
                 post.getTitle(),
                 post.getSummary(),
-                post.getOpensAt(),
-                post.getClosesAt(),
-                post.effectiveStatus(now),
+                post.getOpensOn(),
+                post.getClosesOn(),
+                post.displayStatus(now),
                 post.dDay(now)
         );
     }

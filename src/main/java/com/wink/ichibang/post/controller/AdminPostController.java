@@ -1,11 +1,13 @@
 package com.wink.ichibang.post.controller;
 
-import com.wink.ichibang.post.domain.PostStatus;
+import com.wink.ichibang.post.dto.request.AdminPostFilter;
 import com.wink.ichibang.post.dto.request.PostCreateRequest;
 import com.wink.ichibang.post.dto.request.PostUpdateRequest;
 import com.wink.ichibang.post.dto.response.AdminPostDetailResponse;
 import com.wink.ichibang.post.dto.response.AdminPostSummaryResponse;
-import com.wink.ichibang.post.dto.response.PostIdResponse;
+import com.wink.ichibang.post.dto.response.PostCloseResponse;
+import com.wink.ichibang.post.dto.response.PostCreateResponse;
+import com.wink.ichibang.post.dto.response.PostDeleteResponse;
 import com.wink.ichibang.post.dto.response.PostPageResponse;
 import com.wink.ichibang.post.service.AdminPostService;
 import jakarta.validation.Valid;
@@ -28,7 +30,7 @@ import java.net.URI;
 
 /**
  * 운영진 전용.
- * TODO: 권한 검사(COM-01)와 로그인 회원 ID는 팀에서 인증 방식을 정한 뒤 붙인다.
+ * TODO: 권한 검사와 로그인 회원 ID는 팀에서 인증 방식을 정한 뒤 붙인다.
  */
 @Validated
 @RestController
@@ -41,43 +43,31 @@ public class AdminPostController {
 
     private final AdminPostService adminPostService;
 
-    /** P-3 운영진 기준 신청글 목록 */
+    /** POST-04 운영진 목록. status: ALL(기본) / OPEN / CLOSED */
     @GetMapping
     public PostPageResponse<AdminPostSummaryResponse> getPosts(
-            @RequestParam(required = false) PostStatus status,
+            @RequestParam(defaultValue = "ALL") AdminPostFilter status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size) {
         return adminPostService.getPosts(status, page, size);
     }
 
-    /** P-4 운영진 기준 신청글 상세 */
+    /** 운영진 상세 (수정 화면용, 질문 포함) */
     @GetMapping("/{postId}")
     public AdminPostDetailResponse getPost(@PathVariable Long postId) {
         return adminPostService.getPost(postId);
     }
 
-    /** P-5 신청글 등록 (POST-01) → 201 Created */
+    /** POST-01 작성·게시 (FORM-01 질문 포함) → 201 Created */
     @PostMapping
-    public ResponseEntity<PostIdResponse> create(@Valid @RequestBody PostCreateRequest request) {
-        PostIdResponse response = adminPostService.create(request, TEMP_MEMBER_ID);
+    public ResponseEntity<PostCreateResponse> create(@Valid @RequestBody PostCreateRequest request) {
+        PostCreateResponse response = adminPostService.create(request, TEMP_MEMBER_ID);
         return ResponseEntity
                 .created(URI.create("/api/admin/posts/" + response.postId()))
                 .body(response);
     }
 
-    /** P-6 신청글 게시 (POST-06) */
-    @PostMapping("/{postId}/publish")
-    public PostIdResponse publish(@PathVariable Long postId) {
-        return adminPostService.publish(postId);
-    }
-
-    /** P-7 신청글 수동 마감 (POST-06 제안) */
-    @PostMapping("/{postId}/close")
-    public PostIdResponse close(@PathVariable Long postId) {
-        return adminPostService.close(postId);
-    }
-
-    /** P-8 신청글 수정 (POST-02) */
+    /** POST-02 수정 */
     @PatchMapping("/{postId}")
     public AdminPostDetailResponse update(
             @PathVariable Long postId,
@@ -85,12 +75,15 @@ public class AdminPostController {
         return adminPostService.update(postId, request);
     }
 
-    /** P-9 신청글 삭제 (POST-03): 제출이 있으면 409 → 확인 후 ?confirm=true → 204 No Content */
+    /** POST-03 삭제. 제출자가 있으면 마감 처리 (응답의 result로 구분) */
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Void> delete(
-            @PathVariable Long postId,
-            @RequestParam(defaultValue = "false") boolean confirm) {
-        adminPostService.delete(postId, confirm);
-        return ResponseEntity.noContent().build();
+    public PostDeleteResponse delete(@PathVariable Long postId) {
+        return adminPostService.delete(postId);
+    }
+
+    /** POST-06 수동 마감 */
+    @PostMapping("/{postId}/close")
+    public PostCloseResponse close(@PathVariable Long postId) {
+        return adminPostService.close(postId);
     }
 }
