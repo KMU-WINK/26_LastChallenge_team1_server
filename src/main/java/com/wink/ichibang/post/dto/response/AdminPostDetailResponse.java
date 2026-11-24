@@ -1,11 +1,6 @@
 package com.wink.ichibang.post.dto.response;
 
-import com.wink.ichibang.post.domain.Post;
-import com.wink.ichibang.post.domain.PostStatus;
-import com.wink.ichibang.post.domain.PostType;
-import com.wink.ichibang.post.domain.Question;
-import com.wink.ichibang.post.domain.QuestionOption;
-import com.wink.ichibang.post.domain.QuestionType;
+import com.wink.ichibang.post.domain.*;
 
 import java.time.LocalDate;
 import java.util.List;
