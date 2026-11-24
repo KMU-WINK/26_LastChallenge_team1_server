@@ -1,177 +1,137 @@
 package com.wink.ichibang.post.service;
 
-import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
-import com.wink.ichibang.post.domain.Question;
-import com.wink.ichibang.post.dto.request.AdminPostFilter;
+import com.wink.ichibang.post.domain.PostStatus;
+import com.wink.ichibang.post.domain.PostType;
+import com.wink.ichibang.post.domain.QuestionDraft;
 import com.wink.ichibang.post.dto.request.PostCreateRequest;
 import com.wink.ichibang.post.dto.request.PostUpdateRequest;
-import com.wink.ichibang.post.dto.request.QuestionRequest;
 import com.wink.ichibang.post.dto.response.AdminPostDetailResponse;
-import com.wink.ichibang.post.dto.response.AdminPostSummaryResponse;
-import com.wink.ichibang.post.dto.response.PostCloseResponse;
-import com.wink.ichibang.post.dto.response.PostCreateResponse;
-import com.wink.ichibang.post.dto.response.PostDeleteResponse;
-import com.wink.ichibang.post.dto.response.PostPageResponse;
+import com.wink.ichibang.post.dto.response.AdminPostListItemResponse;
+import com.wink.ichibang.post.dto.response.PageResponse;
+import com.wink.ichibang.post.dto.response.PostIdStatusResponse;
 import com.wink.ichibang.post.exception.PostErrorCode;
 import com.wink.ichibang.post.exception.PostException;
 import com.wink.ichibang.post.port.SubmissionPort;
 import com.wink.ichibang.post.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-/** 운영진용: 목록·상세, 작성(POST-01·FORM-01), 수정(POST-02), 삭제(POST-03), 마감(POST-06) */
+import static com.wink.ichibang.post.service.PostService.latestFirst;
+import static com.wink.ichibang.post.service.PostService.today;
+import static com.wink.ichibang.post.service.QuestionDraftMapper.blankToNull;
+
+/** 운영진용 신청글 관리 (POST-01, 02, 03, 06, 07 + FORM-01) */
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 public class AdminPostService {
 
     private final PostRepository postRepository;
     private final SubmissionPort submissionPort;
 
-    /** POST-04 운영진 목록 (전체 / 모집중 / 마감 탭) */
-    @Transactional(readOnly = true)
-    public PostPageResponse<AdminPostSummaryResponse> getPosts(AdminPostFilter filter, int page, int size) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-
-        Page<Post> posts = switch (filter) {
-            case ALL -> postRepository.findAll(pageable);
-            case OPEN -> postRepository.findOpen(now, pageable);
-            case CLOSED -> postRepository.findClosed(now, pageable);
-        };
-
-        // 한 페이지 최대 50건이라 글마다 제출자 수를 세도 부담이 작다
-        return PostPageResponse.from(posts.map(post ->
-                AdminPostSummaryResponse.of(post, submissionPort.countSubmissions(post.getId()), now)));
-    }
-
-    /** 운영진 상세 (수정 화면용, 질문 포함) */
-    @Transactional(readOnly = true)
-    public AdminPostDetailResponse getPost(Long postId) {
-        return toDetail(findPost(postId), LocalDateTime.now(Post.KST));
-    }
-
-    /** POST-01 작성·게시 + FORM-01 질문. 하나라도 실패하면 아무것도 저장되지 않는다 */
-    public PostCreateResponse create(PostCreateRequest request, Long memberId) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
-        List<Question> questions = toQuestions(request.questions());
-
+    /** POST-01 작성. 질문까지 한 트랜잭션으로 저장 */
+    @Transactional
+    public PostIdStatusResponse create(PostCreateRequest request, Long adminId) {
+        List<QuestionDraft> drafts = QuestionDraftMapper.fromCreate(request.questions());
         Post post = Post.create(
+                request.type(),
                 request.title(),
-                request.summary(),
-                request.description(),
-                request.opensOn(),
-                request.closesOn(),
-                memberId,
-                now
-        );
-        post.addQuestions(questions);
-        postRepository.save(post);   // 질문·선택지도 cascade로 함께 저장
-
-        return PostCreateResponse.of(post, now);
+                blankToNull(request.summary()),
+                request.content(),
+                request.startDate(),
+                request.endDate(),
+                adminId,
+                drafts);
+        postRepository.save(post);
+        return PostIdStatusResponse.of(post.getId(), post.statusOn(today()));
     }
 
-    /** POST-02 수정. 보낸 항목만 바꾸고, questions를 보내면 질문 전체를 교체한다 */
-    public AdminPostDetailResponse update(Long postId, PostUpdateRequest request) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
+    /**
+     * POST-07 목록. 시작 전 글도 보이고 모집 중 탭에 들어간다.
+     * @param status null이면 전체
+     */
+    public PageResponse<AdminPostListItemResponse> getPosts(PostStatus status, PostType type, String keyword,
+                                                            int page, int size) {
+        LocalDate today = today();
+        String trimmed = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        Page<Post> posts = postRepository.findForAdmin(
+                today, type, trimmed,
+                status == PostStatus.OPEN,
+                status == PostStatus.CLOSED,
+                PostStatus.OPEN,
+                latestFirst(page, size));
+
+        Map<Long, Long> counts = submissionPort.countByPostIds(
+                posts.getContent().stream().map(Post::getId).toList());
+        return PageResponse.of(posts, (post, no) ->
+                AdminPostListItemResponse.of(post, no, today, counts.getOrDefault(post.getId(), 0L)));
+    }
+
+    /** POST-02 수정 화면용 조회. 마감 글도 조회는 된다 */
+    public AdminPostDetailResponse getPost(Long postId) {
         Post post = findPost(postId);
-        post.requireEditable(now);   // 마감된 글은 409 POST_CLOSED
-
-        if (request.title() != null) {
-            requireNotBlank(request.title());
-            post.changeTitle(request.title());
-        }
-        if (request.summary() != null) {
-            post.changeSummary(request.summary());
-        }
-        if (request.description() != null) {
-            requireNotBlank(request.description());
-            post.changeDescription(request.description());
-        }
-        if (request.opensOn() != null || request.closesOn() != null) {
-            post.changePeriod(request.opensOn(), request.closesOn(), now);
-        }
-        if (request.questions() != null) {
-            replaceQuestions(post, request.questions());
-        }
-
-        post.touch();
-        postRepository.flush();
-        return toDetail(post, now);
+        return AdminPostDetailResponse.of(post, today(), submissionPort.countByPostId(postId));
     }
 
-    /** POST-03 삭제. 제출자가 있으면 삭제하지 않고 마감한다 */
-    public PostDeleteResponse delete(Long postId) {
-        LocalDateTime now = LocalDateTime.now(Post.KST);
+    /**
+     * POST-02 수정.
+     * - 마감 글 → 409 POST_CLOSED
+     * - 구분 변경 → 400 VALIDATION_FAILED (미지원)
+     * - 제출이 있는데 질문·선택지(순서 포함)가 바뀜 → 409 POST_HAS_SUBMISSIONS. 기본 정보만 바뀌면 허용
+     */
+    @Transactional
+    public PostIdStatusResponse update(Long postId, PostUpdateRequest request) {
+        LocalDate today = today();
         Post post = findPost(postId);
-        long submissionCount = submissionPort.countSubmissions(postId);
+        post.requireOpen(today);
 
-        if (submissionCount == 0) {
-            post.softDelete(now);
-            return PostDeleteResponse.deleted(postId);
+        if (request.type() != post.getType()) {
+            throw PostException.field("type", "구분은 바꿀 수 없어요");
         }
-        if (post.displayStatus(now) == DisplayStatus.CLOSED) {
-            throw new PostException(PostErrorCode.POST_HAS_SUBMISSIONS,
-                    Map.of("submissionCount", submissionCount));
+
+        List<QuestionDraft> drafts = QuestionDraftMapper.fromUpdate(request.questions());
+        if (post.isFormChanged(drafts) && submissionPort.countByPostId(postId) > 0) {
+            throw new PostException(PostErrorCode.POST_HAS_SUBMISSIONS);
         }
-        post.close(now);
-        return PostDeleteResponse.closed(postId, submissionCount);
+
+        post.updateBasicInfo(
+                request.title(),
+                blankToNull(request.summary()),
+                request.content(),
+                request.startDate(),
+                request.endDate());
+        post.mergeQuestions(drafts);
+        return PostIdStatusResponse.of(post.getId(), post.statusOn(today));
     }
 
-    /** POST-06 수동 마감 */
-    public PostCloseResponse close(Long postId) {
+    /** POST-03 삭제. 제출 0건일 때만 소프트 삭제, 아니면 409 */
+    @Transactional
+    public void delete(Long postId) {
         Post post = findPost(postId);
-        post.close(LocalDateTime.now(Post.KST));
-        return PostCloseResponse.of(postId);
+        if (submissionPort.countByPostId(postId) > 0) {
+            throw new PostException(PostErrorCode.POST_HAS_SUBMISSIONS);
+        }
+        post.softDelete();
     }
 
-    // ===== 내부 =====
+    /** POST-06 수동 마감. 이미 마감(수동·자동)이면 409 POST_CLOSED */
+    @Transactional
+    public PostIdStatusResponse close(Long postId) {
+        LocalDate today = today();
+        Post post = findPost(postId);
+        post.close(today);
+        return PostIdStatusResponse.of(post.getId(), PostStatus.CLOSED);
+    }
 
     private Post findPost(Long postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
-    }
-
-    /** FORM-01: 질문이 하나도 없으면 FORM_EMPTY, 선택지 규칙은 Question.create()에서 검사 */
-    private List<Question> toQuestions(List<QuestionRequest> requests) {
-        if (requests == null || requests.isEmpty()) {
-            throw new PostException(PostErrorCode.FORM_EMPTY);
-        }
-        return requests.stream()
-                .map(q -> Question.create(q.title(), q.type(), q.options()))
-                .toList();
-    }
-
-    /** 제출자가 있으면 FORM_LOCKED. 새 질문을 먼저 검증한 뒤에 기존 질문을 지운다 */
-    private void replaceQuestions(Post post, List<QuestionRequest> requests) {
-        if (submissionPort.countSubmissions(post.getId()) > 0) {
-            throw new PostException(PostErrorCode.FORM_LOCKED);
-        }
-        List<Question> newQuestions = toQuestions(requests);
-
-        post.clearQuestions();
-        // 기존 질문 DELETE를 먼저 실행해야 (post_id, order_no) 유니크 키에 걸리지 않는다
-        postRepository.flush();
-        post.addQuestions(newQuestions);
-    }
-
-    private void requireNotBlank(String value) {
-        if (value.isBlank()) {
-            throw new PostException(PostErrorCode.INVALID_INPUT);
-        }
-    }
-
-    private AdminPostDetailResponse toDetail(Post post, LocalDateTime now) {
-        return AdminPostDetailResponse.of(post, submissionPort.countSubmissions(post.getId()), now);
     }
 }

@@ -16,55 +16,73 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+/**
+ * 신청글 (POST-01~07).
+ *
+ * 상태 규칙
+ * - DB status는 운영진의 수동 마감(POST-06)만 기록한다.
+ * - 화면에 내보내는 상태는 {@link #statusOn(LocalDate)}로 계산한다.
+ *   수동 마감했거나 종료일이 지났으면 CLOSED, 아니면 OPEN.
+ * - 시작일 전 글은 OPEN이지만 부원에게는 보이지 않는다({@link #isStartedOn(LocalDate)}).
+ */
 @Entity
 @Table(name = "post")
-@SQLRestriction("deleted_at IS NULL")   // 소프트 삭제된 글은 모든 조회에서 제외 (POST-03)
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post {
 
-    /** 서버 시간 기준. 서비스에서도 이 값을 쓴다 */
     public static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
-    /** 신청 기간은 날짜 단위: 시작일 00:00:00 ~ 마감일 23:59:59 */
-    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR) // MySQL ENUM 대신 VARCHAR로 검증 (ddl-auto: validate 대비)
+    @Column(nullable = false, length = 10)
+    private PostType type;
+
+    @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(length = 100)
-    private String summary;                 // 한 줄 소개 (선택)
+    @Column(length = 200)
+    private String summary;
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    private String description;             // 본문
+    private String content;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR) // MySQL ENUM 대신 VARCHAR로 검증 (ddl-auto: validate 대비)
     @Column(nullable = false, length = 10)
     private PostStatus status;
 
-    @Column(name = "opens_at", nullable = false)
-    private LocalDateTime opensAt;
+    @Column(name = "start_date", nullable = false)
+    private LocalDate startDate;
 
-    @Column(name = "closes_at", nullable = false)
-    private LocalDateTime closesAt;
+    @Column(name = "end_date", nullable = false)
+    private LocalDate endDate;
 
-    @Column(name = "created_by", nullable = false)
+    @Column(name = "created_by", nullable = false, updatable = false)
     private Long createdBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -76,164 +94,149 @@ public class Post {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    /** 신청서 질문 (FORM-01). 신청글과 함께 저장·교체된다 */
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderNo ASC")
     private List<Question> questions = new ArrayList<>();
 
     // ===== 생성 (POST-01) =====
 
-    /** 작성 즉시 게시 상태. 질문은 addQuestions()로 붙인다 */
-    public static Post create(String title, String summary, String description,
-                              LocalDate opensOn, LocalDate closesOn,
-                              Long createdBy, LocalDateTime now) {
-        validatePeriod(opensOn, closesOn, now);
-
+    public static Post create(PostType type, String title, String summary, String content,
+                              LocalDate startDate, LocalDate endDate, Long createdBy,
+                              List<QuestionDraft> drafts) {
+        validatePeriod(startDate, endDate);
         Post post = new Post();
+        post.type = type;
         post.title = title;
-        post.summary = normalize(summary);
-        post.description = description;
-        post.opensAt = opensOn.atStartOfDay();
-        post.closesAt = closesOn.atTime(END_OF_DAY);
-        post.status = PostStatus.OPEN;
+        post.summary = summary;
+        post.content = content;
+        post.startDate = startDate;
+        post.endDate = endDate;
         post.createdBy = createdBy;
+        post.status = PostStatus.OPEN;
+        for (int i = 0; i < drafts.size(); i++) {
+            post.questions.add(Question.create(post, i + 1, drafts.get(i)));
+        }
         return post;
     }
 
+    // ===== 상태 계산 =====
+
+    /** 화면에 내보내는 상태. 수동 마감이거나 종료일이 지나면 CLOSED */
+    public PostStatus statusOn(LocalDate today) {
+        if (status == PostStatus.CLOSED || today.isAfter(endDate)) {
+            return PostStatus.CLOSED;
+        }
+        return PostStatus.OPEN;
+    }
+
+    /** 시작일이 되었는지. 시작 전 글은 부원 목록·상세에서 숨긴다 */
+    public boolean isStartedOn(LocalDate today) {
+        return !today.isBefore(startDate);
+    }
+
+    /** 모집 중일 때만 종료일까지 남은 일수, 마감이면 null */
+    public Integer dDayOn(LocalDate today) {
+        if (statusOn(today) == PostStatus.CLOSED) {
+            return null;
+        }
+        return (int) ChronoUnit.DAYS.between(today, endDate);
+    }
+
+    // ===== 수정 (POST-02) =====
+
+    /** 마감된 글이면 409 POST_CLOSED */
+    public void requireOpen(LocalDate today) {
+        if (statusOn(today) == PostStatus.CLOSED) {
+            throw new PostException(PostErrorCode.POST_CLOSED);
+        }
+    }
+
+    public void updateBasicInfo(String title, String summary, String content,
+                                LocalDate startDate, LocalDate endDate) {
+        validatePeriod(startDate, endDate);
+        this.title = title;
+        this.summary = summary;
+        this.content = content;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
+    /** 요청한 질문 목록이 지금 저장된 질문·선택지(순서 포함)와 다른지 */
+    public boolean isFormChanged(List<QuestionDraft> drafts) {
+        if (drafts.size() != questions.size()) {
+            return true;
+        }
+        for (int i = 0; i < drafts.size(); i++) {
+            if (!questions.get(i).sameAs(drafts.get(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 질문 병합. id가 있으면 유지·수정, 없으면 추가, 요청에서 빠지면 삭제.
+     * 배열 순서가 곧 표시 순서다.
+     */
+    public void mergeQuestions(List<QuestionDraft> drafts) {
+        Map<Long, Question> existing = questions.stream()
+                .collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        Set<Long> keepIds = new HashSet<>();
+        for (int i = 0; i < drafts.size(); i++) {
+            Long id = drafts.get(i).id();
+            if (id == null) {
+                continue;
+            }
+            if (!existing.containsKey(id) || !keepIds.add(id)) {
+                throw PostException.field("questions[" + i + "].id", "이 신청글의 질문이 아니에요");
+            }
+        }
+
+        questions.removeIf(q -> !keepIds.contains(q.getId()));
+
+        for (int i = 0; i < drafts.size(); i++) {
+            QuestionDraft draft = drafts.get(i);
+            if (draft.id() == null) {
+                questions.add(Question.create(this, i + 1, draft));
+            } else {
+                existing.get(draft.id()).update(i + 1, draft, i);
+            }
+        }
+        questions.sort(Comparator.comparingInt(Question::getOrderNo));
+    }
+
+    // ===== 마감 (POST-06) =====
+
+    /** OPEN → CLOSED. 이미 마감(수동·자동)이면 409 POST_CLOSED */
+    public void close(LocalDate today) {
+        requireOpen(today);
+        this.status = PostStatus.CLOSED;
+    }
+
+    // ===== 삭제 (POST-03) =====
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now(KST);
+    }
+
+    // ===== 공통 =====
+
+    private static void validatePeriod(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new PostException(PostErrorCode.INVALID_PERIOD);
+        }
+    }
+
     @PrePersist
-    private void onCreate() {
+    void onCreate() {
         LocalDateTime now = LocalDateTime.now(KST);
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
-    private void onUpdate() {
+    void onUpdate() {
         this.updatedAt = LocalDateTime.now(KST);
-    }
-
-    // ===== 상태 계산 (POST-04 상태 표) =====
-
-    public DisplayStatus displayStatus(LocalDateTime now) {
-        if (status == PostStatus.CLOSED || now.isAfter(closesAt)) {
-            return DisplayStatus.CLOSED;
-        }
-        if (now.isBefore(opensAt)) {
-            return DisplayStatus.UPCOMING;
-        }
-        return DisplayStatus.OPEN;
-    }
-
-    /** 부원에게 보이는가: 시작일이 지났음 (모집 전 글은 숨김) */
-    public boolean isVisible(LocalDateTime now) {
-        return !now.isBefore(opensAt);
-    }
-
-    /** 지금 신청할 수 있는가 = 모집 중 */
-    public boolean isSubmittable(LocalDateTime now) {
-        return displayStatus(now) == DisplayStatus.OPEN;
-    }
-
-    /** 모집 중일 때만 마감일까지 남은 일수, 마감 당일은 0 */
-    public Integer dDay(LocalDateTime now) {
-        if (!isSubmittable(now)) {
-            return null;
-        }
-        return (int) ChronoUnit.DAYS.between(now.toLocalDate(), getClosesOn());
-    }
-
-    public LocalDate getOpensOn() {
-        return opensAt.toLocalDate();
-    }
-
-    public LocalDate getClosesOn() {
-        return closesAt.toLocalDate();
-    }
-
-    // ===== 마감·삭제 (POST-06, POST-03) =====
-
-    /** 수동 마감. 마감일은 그대로 둔다 */
-    public void close(LocalDateTime now) {
-        if (displayStatus(now) == DisplayStatus.CLOSED) {
-            throw new PostException(PostErrorCode.POST_ALREADY_CLOSED);
-        }
-        this.status = PostStatus.CLOSED;
-    }
-
-    public void softDelete(LocalDateTime now) {
-        this.deletedAt = now;
-    }
-
-    // ===== 수정 (POST-02) =====
-
-    /** 마감된 글은 수정 불가 */
-    public void requireEditable(LocalDateTime now) {
-        if (displayStatus(now) == DisplayStatus.CLOSED) {
-            throw new PostException(PostErrorCode.POST_CLOSED);
-        }
-    }
-
-    public void changeTitle(String title) {
-        this.title = title;
-    }
-
-    /** 빈 문자열을 보내면 한 줄 소개를 지운다 */
-    public void changeSummary(String summary) {
-        this.summary = normalize(summary);
-    }
-
-    public void changeDescription(String description) {
-        this.description = description;
-    }
-
-    /**
-     * 시작일: 모집 전일 때만 (같은 값을 다시 보낸 것은 무시)
-     * 마감일: 오늘 이후로만
-     */
-    public void changePeriod(LocalDate newOpensOn, LocalDate newClosesOn, LocalDateTime now) {
-        boolean opensOnChanged = newOpensOn != null && !newOpensOn.equals(getOpensOn());
-        if (opensOnChanged && displayStatus(now) != DisplayStatus.UPCOMING) {
-            throw new PostException(PostErrorCode.POST_FIELD_LOCKED);
-        }
-
-        LocalDate opensOn = opensOnChanged ? newOpensOn : getOpensOn();
-        LocalDate closesOn = (newClosesOn != null) ? newClosesOn : getClosesOn();
-        validatePeriod(opensOn, closesOn, now);
-
-        this.opensAt = opensOn.atStartOfDay();
-        this.closesAt = closesOn.atTime(END_OF_DAY);
-    }
-
-    /** 질문만 바뀐 경우에도 수정 시각을 남긴다 */
-    public void touch() {
-        this.updatedAt = LocalDateTime.now(KST);
-    }
-
-    // ===== 질문 (FORM-01) =====
-
-    /** 받은 순서대로 1부터 순서 번호를 매겨 붙인다 */
-    public void addQuestions(List<Question> newQuestions) {
-        int orderNo = questions.size() + 1;
-        for (Question question : newQuestions) {
-            question.assignTo(this, orderNo++);
-            questions.add(question);
-        }
-    }
-
-    /** 질문 전체 삭제 (orphanRemoval로 DB에서도 지워짐) */
-    public void clearQuestions() {
-        questions.clear();
-    }
-
-    // ===== 내부 =====
-
-    private static void validatePeriod(LocalDate opensOn, LocalDate closesOn, LocalDateTime now) {
-        if (opensOn.isAfter(closesOn) || closesOn.isBefore(now.toLocalDate())) {
-            throw new PostException(PostErrorCode.INVALID_PERIOD);
-        }
-    }
-
-    private static String normalize(String summary) {
-        return (summary == null || summary.isBlank()) ? null : summary.trim();
     }
 }

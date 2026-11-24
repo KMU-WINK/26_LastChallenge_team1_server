@@ -1,51 +1,60 @@
 package com.wink.ichibang.post.dto.response;
 
-import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.post.domain.PostStatus;
+import com.wink.ichibang.post.domain.PostType;
+import com.wink.ichibang.post.domain.Question;
+import com.wink.ichibang.post.domain.QuestionOption;
+import com.wink.ichibang.post.domain.QuestionType;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 운영진 상세 (수정 화면용), 수정 응답 (POST-02).
- * editableQuestions가 false면 프론트는 질문 영역을 잠근다.
- */
+/** POST-02 수정 화면용 조회. POST-01 요청 Body 모양 + id, status, submissionCount */
 public record AdminPostDetailResponse(
-        Long postId,
+        Long id,
+        PostType type,
         String title,
         String summary,
-        String description,
-        LocalDate opensOn,
-        LocalDate closesOn,
-        DisplayStatus status,
-        Integer dDay,
+        LocalDate startDate,
+        LocalDate endDate,
+        String content,
+        PostStatus status,
         long submissionCount,
-        boolean editableQuestions,
-        List<QuestionResponse> questions,
-        Long createdBy,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        List<QuestionResponse> questions
 ) {
-    public static AdminPostDetailResponse of(Post post, long submissionCount, LocalDateTime now) {
-        boolean editableQuestions = submissionCount == 0
-                && post.displayStatus(now) != DisplayStatus.CLOSED;
-
+    public static AdminPostDetailResponse of(Post post, LocalDate today, long submissionCount) {
         return new AdminPostDetailResponse(
                 post.getId(),
+                post.getType(),
                 post.getTitle(),
                 post.getSummary(),
-                post.getDescription(),
-                post.getOpensOn(),
-                post.getClosesOn(),
-                post.displayStatus(now),
-                post.dDay(now),
+                post.getStartDate(),
+                post.getEndDate(),
+                post.getContent(),
+                post.statusOn(today),
                 submissionCount,
-                editableQuestions,
-                post.getQuestions().stream().map(QuestionResponse::from).toList(),
-                post.getCreatedBy(),
-                post.getCreatedAt(),
-                post.getUpdatedAt()
+                post.getQuestions().stream().map(QuestionResponse::of).toList()
         );
+    }
+
+    /** options는 SHORT·LONG이면 빈 배열 */
+    public record QuestionResponse(
+            Long id,
+            String content,
+            String description,
+            QuestionType type,
+            List<OptionResponse> options
+    ) {
+        static QuestionResponse of(Question q) {
+            return new QuestionResponse(q.getId(), q.getContent(), q.getDescription(), q.getType(),
+                    q.getOptions().stream().map(OptionResponse::of).toList());
+        }
+    }
+
+    public record OptionResponse(Long id, String content) {
+        static OptionResponse of(QuestionOption o) {
+            return new OptionResponse(o.getId(), o.getContent());
+        }
     }
 }

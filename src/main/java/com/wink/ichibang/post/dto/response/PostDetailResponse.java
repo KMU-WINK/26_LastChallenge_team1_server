@@ -1,36 +1,56 @@
 package com.wink.ichibang.post.dto.response;
 
-import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.post.domain.PostStatus;
+import com.wink.ichibang.post.domain.PostType;
+import com.wink.ichibang.post.port.SubmissionPort;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
-/** 부원 상세 (POST-05). 작성자는 화면에 "WINK 운영진"으로 고정 표시하므로 보내지 않는다 */
+/** POST-05 부원 상세 */
 public record PostDetailResponse(
-        Long postId,
+        Long id,
+        PostType type,
         String title,
         String summary,
-        String description,
-        LocalDate opensOn,
-        LocalDate closesOn,
-        DisplayStatus status,
+        String content,
+        String authorName,
+        LocalDate createdAt,
+        LocalDate startDate,
+        LocalDate endDate,
+        PostStatus status,
         Integer dDay,
-        boolean submittable,
-        LocalDateTime createdAt
+        MySubmissionResponse mySubmission
 ) {
-    public static PostDetailResponse of(Post post, LocalDateTime now) {
+    /** 등록자는 개인 이름 대신 항상 이 표기 */
+    public static final String AUTHOR_NAME = "WINK 운영진";
+
+    /** @param mySubmission 비로그인이거나 미신청이면 null */
+    public static PostDetailResponse of(Post post, LocalDate today, SubmissionPort.MySubmission mySubmission) {
         return new PostDetailResponse(
                 post.getId(),
+                post.getType(),
                 post.getTitle(),
                 post.getSummary(),
-                post.getDescription(),
-                post.getOpensOn(),
-                post.getClosesOn(),
-                post.displayStatus(now),
-                post.dDay(now),
-                post.isSubmittable(now),
-                post.getCreatedAt()
+                post.getContent(),
+                AUTHOR_NAME,
+                post.getCreatedAt().toLocalDate(),
+                post.getStartDate(),
+                post.getEndDate(),
+                post.statusOn(today),
+                post.dDayOn(today),
+                mySubmission == null ? null : MySubmissionResponse.of(mySubmission)
         );
+    }
+
+    public record MySubmissionResponse(Long submissionId, String status, LocalDateTime submittedAt) {
+
+        static MySubmissionResponse of(SubmissionPort.MySubmission s) {
+            // 명세 예시 "2026-11-20T14:32:00"에 맞춰 초 단위로 자른다
+            return new MySubmissionResponse(s.submissionId(), s.status(),
+                    s.submittedAt().truncatedTo(ChronoUnit.SECONDS));
+        }
     }
 }

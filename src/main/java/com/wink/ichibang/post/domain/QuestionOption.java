@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 객관식 선택지 */
+/** 객관식 선택지. 명세의 option 테이블 (option은 MySQL 예약어라 question_option으로 이름 변경) */
 @Entity
 @Table(name = "question_option")
 @Getter
@@ -31,14 +31,19 @@ public class QuestionOption {
     @Column(name = "order_no", nullable = false)
     private int orderNo;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 200)
     private String content;
 
-    static QuestionOption of(Question question, int orderNo, String content) {
+    static QuestionOption create(Question question, int orderNo, String content) {
         QuestionOption option = new QuestionOption();
         option.question = question;
         option.orderNo = orderNo;
         option.content = content;
         return option;
+    }
+
+    void update(int orderNo, String content) {
+        this.orderNo = orderNo;
+        this.content = content;
     }
 }

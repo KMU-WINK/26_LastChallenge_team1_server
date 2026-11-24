@@ -1,10 +1,10 @@
 package com.wink.ichibang.post.domain;
 
 /**
- * DB에 저장되는 신청글 상태. 운영진의 행동만 기록한다.
- * 화면에 보일 상태는 Post#displayStatus(now)로 계산한다.
+ * 신청글 상태 (POST-06). OPEN → CLOSED 한 방향.
+ * DB에는 운영진의 수동 마감만 기록하고, 종료일이 지나면 조회할 때 CLOSED로 계산한다.
  */
 public enum PostStatus {
-    OPEN,    // 게시됨 (작성 즉시)
-    CLOSED   // 수동 마감
+    OPEN,    // 모집 중
+    CLOSED   // 마감
 }
