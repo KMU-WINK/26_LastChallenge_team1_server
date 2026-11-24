@@ -7,7 +7,7 @@ import lombok.Getter;
 public class PostException extends RuntimeException {
 
     private final PostErrorCode errorCode;
-    private final Object detail;   // 에러 응답의 detail (예: { "submissionCount": 12 })
+    private final Object detail;   // 에러 응답의 detail (예: { "submissionCount": 24 })
 
     public PostException(PostErrorCode errorCode) {
         this(errorCode, null);

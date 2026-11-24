@@ -1,40 +1,48 @@
 package com.wink.ichibang.post.dto.response;
 
+import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
-import com.wink.ichibang.post.domain.PostStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
-/** 운영진 기준 신청글의 상세, 수정 응답 */
+/**
+ * 운영진 상세 (수정 화면용), 수정 응답 (POST-02).
+ * editableQuestions가 false면 프론트는 질문 영역을 잠근다.
+ */
 public record AdminPostDetailResponse(
         Long postId,
         String title,
         String summary,
-        LocalDateTime opensAt,
-        LocalDateTime closesAt,
-        PostStatus status,
-        boolean visible,
+        String description,
+        LocalDate opensOn,
+        LocalDate closesOn,
+        DisplayStatus status,
         Integer dDay,
-        boolean submittable,
         long submissionCount,
-        LocalDateTime publishedAt,
-        Long createdBy,          // 작성자 회원 ID (이름은 회원 기능이 생기면 추가)
+        boolean editableQuestions,
+        List<QuestionResponse> questions,
+        Long createdBy,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
     public static AdminPostDetailResponse of(Post post, long submissionCount, LocalDateTime now) {
+        boolean editableQuestions = submissionCount == 0
+                && post.displayStatus(now) != DisplayStatus.CLOSED;
+
         return new AdminPostDetailResponse(
                 post.getId(),
                 post.getTitle(),
                 post.getSummary(),
-                post.getOpensAt(),
-                post.getClosesAt(),
-                post.effectiveStatus(now),
-                post.isVisible(now),
+                post.getDescription(),
+                post.getOpensOn(),
+                post.getClosesOn(),
+                post.displayStatus(now),
                 post.dDay(now),
-                post.isSubmittable(now),
                 submissionCount,
-                post.getPublishedAt(),
+                editableQuestions,
+                post.getQuestions().stream().map(QuestionResponse::from).toList(),
                 post.getCreatedBy(),
                 post.getCreatedAt(),
                 post.getUpdatedAt()

@@ -1,31 +1,36 @@
 package com.wink.ichibang.post.dto.response;
 
+import com.wink.ichibang.post.domain.DisplayStatus;
 import com.wink.ichibang.post.domain.Post;
-import com.wink.ichibang.post.domain.PostStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/** 공개 상세 */
+/** 부원 상세 (POST-05). 작성자는 화면에 "WINK 운영진"으로 고정 표시하므로 보내지 않는다 */
 public record PostDetailResponse(
         Long postId,
         String title,
         String summary,
-        LocalDateTime opensAt,
-        LocalDateTime closesAt,
-        PostStatus status,
+        String description,
+        LocalDate opensOn,
+        LocalDate closesOn,
+        DisplayStatus status,
         Integer dDay,
-        boolean submittable
+        boolean submittable,
+        LocalDateTime createdAt
 ) {
     public static PostDetailResponse of(Post post, LocalDateTime now) {
         return new PostDetailResponse(
                 post.getId(),
                 post.getTitle(),
                 post.getSummary(),
-                post.getOpensAt(),
-                post.getClosesAt(),
-                post.effectiveStatus(now),
+                post.getDescription(),
+                post.getOpensOn(),
+                post.getClosesOn(),
+                post.displayStatus(now),
                 post.dDay(now),
-                post.isSubmittable(now)
+                post.isSubmittable(now),
+                post.getCreatedAt()
         );
     }
 }

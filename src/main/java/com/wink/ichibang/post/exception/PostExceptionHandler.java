@@ -19,14 +19,14 @@ import java.util.List;
 @RestControllerAdvice(basePackages = "com.wink.ichibang.post")
 public class PostExceptionHandler {
 
-    /** 도메인 규칙 위반 (POST_NOT_FOUND, POST_NOT_DRAFT ...) */
+    /** 도메인 규칙 위반 */
     @ExceptionHandler(PostException.class)
     public ResponseEntity<PostErrorResponse> handlePostException(PostException e) {
         PostErrorCode code = e.getErrorCode();
         return ResponseEntity.status(code.getStatus()).body(PostErrorResponse.of(code, e.getDetail()));
     }
 
-    /** @Valid @RequestBody 검증 실패 → 필드별 사유를 detail에 담는다 */
+    /** @Valid @RequestBody 검증 실패 → 필드별 사유 (예: questions[1].title) */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<PostErrorResponse> handleInvalidBody(MethodArgumentNotValidException e) {
         List<FieldErrorDetail> fields = e.getBindingResult().getFieldErrors().stream()
@@ -35,7 +35,7 @@ public class PostExceptionHandler {
         return badRequest(fields);
     }
 
-    /** 쿼리 파라미터 검증 실패·누락, 잘못된 enum 값, 깨진 JSON */
+    /** 쿼리 파라미터 검증 실패·누락, 잘못된 enum 값, 깨진 JSON, 잘못된 날짜 형식 */
     @ExceptionHandler({
             HandlerMethodValidationException.class,
             ConstraintViolationException.class,
