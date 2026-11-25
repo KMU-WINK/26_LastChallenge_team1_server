@@ -127,9 +127,23 @@ class SubmissionServiceTest {
     @Test
     void 동시_요청으로_유니크_제약에_걸리면_DUPLICATE_SUBMISSION() {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("dup"));
+        // 실제 MySQL은 원인 예외 메시지에 제약 이름을 담아 보낸다
+        when(submissionRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("Duplicate entry '100-7' for key 'submission.uk_submission_post_member'")));
 
         assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.DUPLICATE_SUBMISSION);
+    }
+
+    @Test
+    void 다른_무결성_오류는_중복으로_바꾸지_않고_그대로_던진다() {
+        when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
+        DataIntegrityViolationException other = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("Cannot add or update a child row: a foreign key constraint fails"));
+        when(submissionRepository.saveAndFlush(any())).thenThrow(other);
+
+        assertThatThrownBy(() -> service.submit(POST_ID, MEMBER_ID, request())).isSameAs(other);
     }
 
     @Test
@@ -148,7 +162,7 @@ class SubmissionServiceTest {
         Submission submission = existing(SubmissionStatus.SUBMITTED, "이전 답");
         LocalDateTime submittedAt = submission.getSubmittedAt();
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
         // flush 시점마다 메모리의 답변 수를 기록해 "삭제 반영 → 새 답변 추가" 순서를 확인한다
         List<Integer> answerCountAtFlush = new ArrayList<>();
         doAnswer(invocation -> answerCountAtFlush.add(submission.getAnswers().size()))
@@ -168,7 +182,7 @@ class SubmissionServiceTest {
     @Test
     void 수정할_제출이_없으면_SUBMISSION_NOT_FOUND() {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.empty());
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.empty());
 
         assertCode(() -> service.update(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.SUBMISSION_NOT_FOUND);
     }
@@ -177,7 +191,7 @@ class SubmissionServiceTest {
     void 참여_완료된_제출은_수정할_수_없다() {
         Submission submission = existing(SubmissionStatus.COMPLETED, "이전 답");
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
         assertCode(() -> service.update(POST_ID, MEMBER_ID, request(shortAnswer("새 답"))),
                 SubmissionErrorCode.SUBMISSION_COMPLETED);
@@ -188,7 +202,7 @@ class SubmissionServiceTest {
     void 수정할_때_잘못된_답변이면_기존_답변을_지우지_않는다() {
         Submission submission = existing(SubmissionStatus.SUBMITTED, "이전 답");
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
         assertCode(() -> service.update(POST_ID, MEMBER_ID, request(new AnswerRequest(999L, null, "x"))),
                 SubmissionErrorCode.INVALID_ANSWER);
@@ -201,7 +215,7 @@ class SubmissionServiceTest {
                 .thenThrow(new SubmissionException(SubmissionErrorCode.APPLY_POST_NOT_OPEN));
 
         assertCode(() -> service.update(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.APPLY_POST_NOT_OPEN);
-        verify(submissionRepository, never()).findByPostIdAndMemberId(any(), any());
+        verify(submissionRepository, never()).findForUpdateByPostIdAndMemberId(any(), any());
     }
 
     // ===== SUB-03 =====
@@ -210,7 +224,7 @@ class SubmissionServiceTest {
     void 취소하면_제출을_삭제한다() {
         Submission submission = existing(SubmissionStatus.SUBMITTED, "답");
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
         service.cancel(POST_ID, MEMBER_ID);
 
@@ -220,7 +234,7 @@ class SubmissionServiceTest {
     @Test
     void 취소할_제출이_없으면_SUBMISSION_NOT_FOUND() {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.empty());
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.empty());
 
         assertCode(() -> service.cancel(POST_ID, MEMBER_ID), SubmissionErrorCode.SUBMISSION_NOT_FOUND);
     }
@@ -229,7 +243,7 @@ class SubmissionServiceTest {
     void 참여_완료된_제출은_취소할_수_없다() {
         Submission submission = existing(SubmissionStatus.COMPLETED, "답");
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
-        when(submissionRepository.findByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
+        when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
         assertCode(() -> service.cancel(POST_ID, MEMBER_ID), SubmissionErrorCode.SUBMISSION_COMPLETED);
         verify(submissionRepository, never()).delete(any(Submission.class));

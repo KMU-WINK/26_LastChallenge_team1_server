@@ -1,11 +1,10 @@
 package com.wink.ichibang.submission.controller;
 
+import com.wink.ichibang.auth.CurrentMember;
 import com.wink.ichibang.post.dto.ApiResponse;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.response.SubmissionCreatedResponse;
 import com.wink.ichibang.submission.dto.response.SubmissionUpdatedResponse;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
 import com.wink.ichibang.submission.service.SubmissionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,14 +15,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 부원 신청서 제출·수정·취소 (COM-01: 로그인 필요).
- * TODO(인증): 로그인 연동 전까지 PostController처럼 X-Member-Id 헤더로 부원을 흉내 낸다.
- *             헤더가 없으면 401. 인증 필터가 생기면 이 헤더 처리를 걷어낸다.
+ * 로그인한 부원은 CurrentMember로 꺼낸다 (헤더가 없거나 1 이상의 숫자가 아니면 401).
  */
 @RestController
 @RequestMapping("/api/posts/{postId}/submissions")
@@ -31,15 +28,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class SubmissionController {
 
     private final SubmissionService submissionService;
+    private final CurrentMember currentMember;
 
     /** SUB-01 신청서 제출 → 201 */
     @PostMapping
     public ResponseEntity<ApiResponse<SubmissionCreatedResponse>> submit(
             @PathVariable Long postId,
-            @RequestHeader(value = "X-Member-Id", required = false) Long memberId,
             @Valid @RequestBody(required = false) SubmissionRequest request) {
         SubmissionCreatedResponse response =
-                submissionService.submit(postId, requireMember(memberId), orEmpty(request));
+                submissionService.submit(postId, currentMember.requireId(), orEmpty(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response));
     }
 
@@ -47,25 +44,15 @@ public class SubmissionController {
     @PutMapping("/me")
     public ApiResponse<SubmissionUpdatedResponse> update(
             @PathVariable Long postId,
-            @RequestHeader(value = "X-Member-Id", required = false) Long memberId,
             @Valid @RequestBody(required = false) SubmissionRequest request) {
-        return ApiResponse.of(submissionService.update(postId, requireMember(memberId), orEmpty(request)));
+        return ApiResponse.of(submissionService.update(postId, currentMember.requireId(), orEmpty(request)));
     }
 
     /** SUB-03 신청 취소 → 204 */
     @DeleteMapping("/me")
-    public ResponseEntity<Void> cancel(
-            @PathVariable Long postId,
-            @RequestHeader(value = "X-Member-Id", required = false) Long memberId) {
-        submissionService.cancel(postId, requireMember(memberId));
+    public ResponseEntity<Void> cancel(@PathVariable Long postId) {
+        submissionService.cancel(postId, currentMember.requireId());
         return ResponseEntity.noContent().build();
-    }
-
-    private static Long requireMember(Long memberId) {
-        if (memberId == null) {
-            throw new SubmissionException(SubmissionErrorCode.UNAUTHORIZED);
-        }
-        return memberId;
     }
 
     /** Body 없이 보내도 "모두 비운 제출"로 본다 (질문은 모두 선택 응답) */
