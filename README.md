@@ -113,7 +113,13 @@ erDiagram
     answer ||--o{ answer_option : "고른 선택지"
     question ||--o{ answer : "참조"
     question_option ||--o{ answer_option : "참조"
+    member ||--o{ submission : "제출자"
 
+    member {
+        BIGINT id PK
+        VARCHAR name
+        VARCHAR student_no
+    }
     post {
         BIGINT id PK
         VARCHAR type "STUDY / EVENT"
@@ -161,6 +167,7 @@ erDiagram
 
 | 테이블 | 설명 |
 |:--|:--|
+| `member` | 회원. 제출자 관리에서 이름·학번을 표시할 때 사용 (**임시**) |
 | `post` | 신청글. 수동 마감 여부, 기간, 소프트 삭제 |
 | `question` | 신청서 질문. 유형, 설명, 표시 순서 |
 | `question_option` | 객관식 선택지 (`option`이 MySQL 예약어라 이름 변경) |
@@ -169,7 +176,10 @@ erDiagram
 | `answer_option` | 객관식 답에서 고른 선택지 (MULTI는 여러 행) |
 
 - 스키마: [`src/main/resources/db/migration/V1__init.sql`](src/main/resources/db/migration/V1__init.sql)
-- 회원(`member`) 테이블은 로그인 담당 영역이라 포함하지 않습니다. 제출자 관리는 `member`의 `id`, `name`, `student_no`를 읽습니다.
+
+> [!NOTE]
+> `member`는 로그인 기능이 붙기 전까지 쓰는 **임시 테이블**입니다. 제출자 관리(FORM-03·05·06)가 읽는 `id`, `name`, `student_no`만 있습니다.
+> `submission.member_id`와는 외래키 없이 ID로만 연결합니다. 홈페지이 연동 확정 시 기존 회원 테이블로 바꿉니다.
 
 <br>
 
@@ -183,7 +193,20 @@ CREATE USER 'wink'@'localhost' IDENTIFIED BY '<비밀번호>';
 GRANT ALL PRIVILEGES ON ichibang.* TO 'wink'@'localhost';
 ```
 
-이어서 `V1__init.sql`을 실행해 테이블을 만듭니다.
+이어서 `V1__init.sql`을 실행해 테이블을 만들고, 임시 회원 테이블과 테스트 회원을 추가합니다.
+
+```sql
+CREATE TABLE member (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(50)  NOT NULL,
+    student_no  VARCHAR(20)  NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+INSERT INTO member (id, name, student_no) VALUES
+  (1,  '운영진', '20210001'),
+  (10, '홍길동', '20241234');
+```
 
 > [!TIP]
 > Ubuntu의 MySQL `root`는 auth_socket 인증이라 애플리케이션에서 접속할 수 없습니다. 위처럼 전용 계정을 만들어 주세요.
@@ -327,6 +350,6 @@ Content-Type: application/json
 
 - [ ] COM-01 로그인 연동 (기존 로그인 방식 확인 후 임시 헤더 인증 교체)
 - [ ] SUB-04 MY 신청 목록 `GET /api/submissions/me`
-- [ ] 회원(`member`) 테이블 확정 후 제출자 관리의 이름·학번 조회 확인
+- [ ] 임시 `member` 테이블을 로그인 담당의 회원 테이블로 교체
 - [ ] 공통 응답·오류 처리(global) 패키지로 도메인별 예외 핸들러 통합
 - [ ] 명세의 "확인 필요" 항목 확정 (구분 변경 허용 여부, 단답·서술 글자 수 제한 등)
