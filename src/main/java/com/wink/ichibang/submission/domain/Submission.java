@@ -16,6 +16,7 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -32,6 +33,7 @@ import java.util.List;
 @Table(name = "submission", uniqueConstraints = @UniqueConstraint(
         name = "uk_submission_post_member", columnNames = {"post_id", "member_id"}))
 @Getter
+@DynamicUpdate // 바꾼 컬럼만 UPDATE. 읽어 둔 status·completed_at으로 운영진의 참여 완료 처리를 덮어쓰지 않게 한다
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Submission {
 
