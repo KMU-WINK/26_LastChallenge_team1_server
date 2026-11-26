@@ -1,0 +1,5 @@
+# local 프로필일 때만 적용된다 (application.yml의 spring.profiles.group).
+# 운영 마이그레이션(db/migration)에 더해 로컬 개발용 임시 회원 테이블·테스트 회원(db/dev)도 실행한다.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev

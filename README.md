@@ -181,11 +181,12 @@ erDiagram
 | `answer` | 질문 하나에 대한 답. 단답·서술은 `text` |
 | `answer_option` | 객관식 답에서 고른 선택지 (MULTI는 여러 행) |
 
-- 스키마: [`src/main/resources/db/migration/V1__init.sql`](src/main/resources/db/migration/V1__init.sql)
+- 스키마: [`src/main/resources/db/migration/V1__init.sql`](src/main/resources/db/migration/V1__init.sql) (Flyway가 서버를 시작할 때 자동으로 적용합니다)
 
 > [!NOTE]
 > `member`는 로그인 기능이 붙기 전까지 쓰는 **임시 테이블**입니다. 제출자 관리(FORM-03·05·06)가 읽는 `id`, `name`, `student_no`만 있습니다.
 > `submission.member_id`와는 외래키 없이 ID로만 연결합니다. 홈페지이 연동 확정 시 기존 회원 테이블로 바꿉니다.
+> 임시 `member` 테이블과 테스트 회원은 `db/migration`이 아니라 로컬 전용 [`db/dev/R__temp_member.sql`](src/main/resources/db/dev/R__temp_member.sql)에 있어서, `local` 프로필에서만 만들어집니다 (운영에는 들어가지 않습니다).
 
 <br>
 
@@ -193,29 +194,30 @@ erDiagram
 
 ### 1. 데이터베이스 준비
 
+데이터베이스와 계정만 만들면 됩니다. **테이블은 직접 만들지 않습니다.**
+
 ```sql
-CREATE DATABASE ichibang DEFAULT CHARACTER SET utf8mb4;
+CREATE DATABASE ichibang DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 CREATE USER 'wink'@'localhost' IDENTIFIED BY '<비밀번호>';
 GRANT ALL PRIVILEGES ON ichibang.* TO 'wink'@'localhost';
 ```
 
-이어서 `V1__init.sql`을 실행해 테이블을 만들고, 임시 회원 테이블과 테스트 회원을 추가합니다.
-
-```sql
-CREATE TABLE member (
-    id          BIGINT       NOT NULL AUTO_INCREMENT,
-    name        VARCHAR(50)  NOT NULL,
-    student_no  VARCHAR(20)  NOT NULL,
-    PRIMARY KEY (id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-
-INSERT INTO member (id, name, student_no) VALUES
-  (1,  '운영진', '20210001'),
-  (10, '홍길동', '20241234');
-```
+서버를 처음 실행하면 Flyway가 `V1__init.sql`로 테이블을 만들고, `local` 프로필에서는 임시 회원 테이블과 테스트 회원(운영진, 김호)도 함께 넣습니다.
+팀원 모두 같은 SQL 파일이 같은 순서로 적용되므로 DB 상태가 서로 달라지지 않습니다.
 
 > [!TIP]
 > Ubuntu의 MySQL `root`는 auth_socket 인증이라 애플리케이션에서 접속할 수 없습니다. 위처럼 전용 계정을 만들어 주세요.
+
+> [!IMPORTANT]
+> **예전에 `V1__init.sql`을 직접 실행했거나 `ddl-auto: update`로 만든 DB**도 그대로 쓸 수 있습니다. 첫 실행 때 Flyway가 "V1은 이미 적용됨"으로 기록하고 이어갑니다.
+> 다만 서버를 시작할 때 엔티티와 DB가 다르면 `Schema validation: missing column ...` 같은 오류로 멈춥니다. 이때는 DB를 비우고 다시 시작하는 게 가장 간단합니다.
+>
+> ```sql
+> DROP DATABASE ichibang;
+> CREATE DATABASE ichibang DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+> ```
+>
+> SQL을 터미널에서 직접 실행하면 클라이언트 문자셋에 따라 한글이 깨질 수 있으니 직접 넣지 않습니다.
 
 ### 2. 로컬 설정 파일
 
@@ -227,9 +229,6 @@ spring:
     url: jdbc:mysql://localhost:3306/ichibang?serverTimezone=Asia/Seoul
     username: wink
     password: <비밀번호>
-  jpa:
-    hibernate:
-      ddl-auto: validate
 ```
 
 > [!WARNING]
@@ -242,6 +241,15 @@ spring:
 ```
 
 IntelliJ에서는 Run Configuration의 **Active profiles**에 `local`을 넣고 실행합니다.
+
+### 4. 스키마를 바꿀 때
+
+엔티티를 고치면서 DB 컬럼도 바뀐다면 **마이그레이션 파일을 같이 추가**합니다. 엔티티와 DB가 다르면 서버가 시작되지 않습니다(`ddl-auto: validate`).
+
+- `src/main/resources/db/migration/`에 `V2__설명.sql`처럼 **새 번호의 파일을 추가**합니다. 이미 적용된 파일(`V1__init.sql` 등)은 고치지 않습니다. 고치면 다른 팀원 DB에서 "checksum 불일치"로 서버가 멈춥니다.
+- 파일은 UTF-8로 저장합니다.
+- 번호가 겹치지 않게 PR을 올리기 전에 `main`의 최신 번호를 확인합니다.
+- 테스트(`./gradlew test`)는 개발 DB가 아니라 전용 스키마 `ichibang_test`를 매번 비우고 같은 마이그레이션으로 다시 만들어 씁니다.
 
 <br>
 
@@ -356,6 +364,6 @@ Content-Type: application/json
 
 - [ ] COM-01 로그인 연동 (기존 로그인 방식 확인 후 임시 헤더 인증 교체)
 - [ ] SUB-04 MY 신청 목록 `GET /api/submissions/me`
-- [ ] 임시 `member` 테이블을 로그인 담당의 회원 테이블로 교체
+- [ ] 임시 `member` 테이블(`db/dev/R__temp_member.sql`)을 로그인 담당의 회원 테이블로 교체
 - [x] 공통 응답·오류 처리(global) 패키지로 도메인별 예외 핸들러 통합
 - [ ] 명세의 "확인 필요" 항목 확정 (구분 변경 허용 여부, 단답·서술 글자 수 제한 등)

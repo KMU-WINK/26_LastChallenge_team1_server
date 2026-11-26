@@ -32,8 +32,8 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     //FlyWay
-    //implementation 'org.springframework.boot:spring-boot-starter-flyway'
-    //implementation 'org.flywaydb:flyway-mysql'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-mysql'
 
     //Lombok
     compileOnly 'org.projectlombok:lombok:1.18.36'
