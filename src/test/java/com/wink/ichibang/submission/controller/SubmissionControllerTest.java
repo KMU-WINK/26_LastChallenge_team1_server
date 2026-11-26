@@ -1,11 +1,10 @@
 package com.wink.ichibang.submission.controller;
 
-import com.wink.ichibang.auth.AccessExceptionHandler;
 import com.wink.ichibang.auth.CurrentMember;
+import com.wink.ichibang.global.exception.GlobalExceptionHandler;
 import com.wink.ichibang.submission.domain.SubmissionStatus;
 import com.wink.ichibang.submission.dto.response.SubmissionCreatedResponse;
 import com.wink.ichibang.submission.dto.response.SubmissionUpdatedResponse;
-import com.wink.ichibang.submission.exception.SubmissionExceptionHandler;
 import com.wink.ichibang.submission.service.SubmissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +52,7 @@ class SubmissionControllerTest {
         // CurrentMember는 요청의 헤더를 읽는다. 테스트에서는 한 요청만 보내므로 mock 요청의 헤더를 직접 정한다
         SubmissionController controller = new SubmissionController(submissionService, new CurrentMember(servletRequest));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new AccessExceptionHandler(), new SubmissionExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 

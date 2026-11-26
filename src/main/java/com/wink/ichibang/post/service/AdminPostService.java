@@ -8,10 +8,10 @@ import com.wink.ichibang.post.dto.request.PostCreateRequest;
 import com.wink.ichibang.post.dto.request.PostUpdateRequest;
 import com.wink.ichibang.post.dto.response.AdminPostDetailResponse;
 import com.wink.ichibang.post.dto.response.AdminPostListItemResponse;
-import com.wink.ichibang.post.dto.response.PageResponse;
+import com.wink.ichibang.global.response.PageResponse;
 import com.wink.ichibang.post.dto.response.PostIdStatusResponse;
-import com.wink.ichibang.post.exception.PostErrorCode;
-import com.wink.ichibang.post.exception.PostException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import com.wink.ichibang.post.port.SubmissionPort;
 import com.wink.ichibang.post.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
@@ -93,12 +93,12 @@ public class AdminPostService {
         post.requireOpen(today);
 
         if (request.type() != post.getType()) {
-            throw PostException.field("type", "구분은 바꿀 수 없어요");
+            throw BusinessException.field(ErrorCode.VALIDATION_FAILED, "type", "구분은 바꿀 수 없어요");
         }
 
         List<QuestionDraft> drafts = QuestionDraftMapper.fromUpdate(request.questions());
         if (post.isFormChanged(drafts) && submissionPort.countByPostId(postId) > 0) {
-            throw new PostException(PostErrorCode.POST_HAS_SUBMISSIONS);
+            throw new BusinessException(ErrorCode.POST_HAS_SUBMISSIONS);
         }
 
         post.updateBasicInfo(
@@ -116,7 +116,7 @@ public class AdminPostService {
     public void delete(Long postId) {
         Post post = findPost(postId);
         if (submissionPort.countByPostId(postId) > 0) {
-            throw new PostException(PostErrorCode.POST_HAS_SUBMISSIONS);
+            throw new BusinessException(ErrorCode.POST_HAS_SUBMISSIONS);
         }
         post.softDelete();
     }
@@ -132,6 +132,6 @@ public class AdminPostService {
 
     private Post findPost(Long postId) {
         return postRepository.findById(postId)
-                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
     }
 }

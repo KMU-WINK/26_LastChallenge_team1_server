@@ -1,8 +1,9 @@
 package com.wink.ichibang.form.service;
 
 import com.wink.ichibang.form.dto.FormResponses.*;
-import com.wink.ichibang.form.exception.FormErrorCode;
-import com.wink.ichibang.form.exception.FormException;
+import com.wink.ichibang.global.time.TimeZones;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import com.wink.ichibang.form.repository.MemberLookup;
 import com.wink.ichibang.form.repository.MemberLookup.MemberName;
 import com.wink.ichibang.post.domain.Post;
@@ -52,10 +53,10 @@ public class FormService {
         LocalDate today = today();
         Post post = findPost(postId);
         if (!post.isStartedOn(today)) {
-            throw new FormException(FormErrorCode.POST_NOT_FOUND);
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
         if (post.statusOn(today) != PostStatus.OPEN) {
-            throw new FormException(FormErrorCode.APPLY_POST_NOT_OPEN);
+            throw new BusinessException(ErrorCode.APPLY_POST_NOT_OPEN);
         }
 
         List<Row> mine = jdbc.query(
@@ -131,11 +132,11 @@ public class FormService {
         findPost(postId);
         Row r = findSubmission(postId, submissionId);
         if (r.status() == target) {
-            throw new FormException(FormErrorCode.INVALID_STATUS_TRANSITION);
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION);
         }
 
         LocalDateTime completedAt = target == SubmissionStatus.COMPLETED
-                ? LocalDateTime.now(Post.KST).truncatedTo(ChronoUnit.SECONDS)
+                ? LocalDateTime.now(TimeZones.KST).truncatedTo(ChronoUnit.SECONDS)
                 : null;
         // 동시에 두 번 누른 경우를 막으려고 현재 상태까지 조건에 넣는다
         int updated = jdbc.update(
@@ -143,7 +144,7 @@ public class FormService {
                 target.name(), completedAt,
                 submissionId, postId, r.status().name());
         if (updated == 0) {
-            throw new FormException(FormErrorCode.INVALID_STATUS_TRANSITION);
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION);
         }
         return new StatusChangeResponse(submissionId, target, completedAt);
     }
@@ -286,11 +287,11 @@ public class FormService {
                         "SELECT " + SUBMISSION_COLUMNS + " FROM submission WHERE id = ? AND post_id = ?",
                         FormService::row, submissionId, postId)
                 .stream().findFirst()
-                .orElseThrow(() -> new FormException(FormErrorCode.SUBMISSION_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBMISSION_NOT_FOUND));
     }
 
     private Post findPost(Long postId) {
-        return posts.findById(postId).orElseThrow(() -> new FormException(FormErrorCode.POST_NOT_FOUND));
+        return posts.findById(postId).orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
     }
 
     private PostSummary postSummary(Post post) {
@@ -331,6 +332,6 @@ public class FormService {
     }
 
     private static LocalDate today() {
-        return LocalDate.now(Post.KST);
+        return LocalDate.now(TimeZones.KST);
     }
 }

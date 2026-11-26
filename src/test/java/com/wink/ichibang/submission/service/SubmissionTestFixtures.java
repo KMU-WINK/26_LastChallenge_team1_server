@@ -1,6 +1,7 @@
 package com.wink.ichibang.submission.service;
 
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.post.domain.PostType;
 import com.wink.ichibang.post.domain.QuestionDraft;
 import com.wink.ichibang.post.domain.QuestionDraft.OptionDraft;
@@ -23,7 +24,7 @@ final class SubmissionTestFixtures {
 
     /** 오늘 시작해 내일 끝나는 모집 중인 글 */
     static Post openPost() {
-        LocalDate today = LocalDate.now(Post.KST);
+        LocalDate today = LocalDate.now(TimeZones.KST);
         return post(today, today.plusDays(1));
     }
 

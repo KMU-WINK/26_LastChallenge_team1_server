@@ -1,8 +1,8 @@
 package com.wink.ichibang.post.controller;
 
 import com.wink.ichibang.post.domain.PostType;
-import com.wink.ichibang.post.dto.ApiResponse;
-import com.wink.ichibang.post.dto.response.PageResponse;
+import com.wink.ichibang.global.response.ApiResponse;
+import com.wink.ichibang.global.response.PageResponse;
 import com.wink.ichibang.post.dto.response.PostDetailResponse;
 import com.wink.ichibang.post.dto.response.PostListItemResponse;
 import com.wink.ichibang.post.service.PostService;

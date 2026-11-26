@@ -1,9 +1,10 @@
 package com.wink.ichibang.submission.service;
 
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.post.repository.PostRepository;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,17 +22,17 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ApplyPolicyTest {
 
-    private static final LocalDate TODAY = LocalDate.now(Post.KST);
+    private static final LocalDate TODAY = LocalDate.now(TimeZones.KST);
 
     @Mock
     PostRepository postRepository;
     @InjectMocks
     ApplyPolicy applyPolicy;
 
-    private void assertCode(Post post, SubmissionErrorCode expected) {
+    private void assertCode(Post post, ErrorCode expected) {
         when(postRepository.findById(100L)).thenReturn(Optional.ofNullable(post));
         assertThatThrownBy(() -> applyPolicy.requireApplicable(100L))
-                .isInstanceOfSatisfying(SubmissionException.class,
+                .isInstanceOfSatisfying(BusinessException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(expected));
     }
 
@@ -54,24 +55,24 @@ class ApplyPolicyTest {
     @Test
     void 종료일이_지나면_APPLY_POST_NOT_OPEN() {
         assertCode(SubmissionTestFixtures.post(TODAY.minusDays(3), TODAY.minusDays(1)),
-                SubmissionErrorCode.APPLY_POST_NOT_OPEN);
+                ErrorCode.APPLY_POST_NOT_OPEN);
     }
 
     @Test
     void 수동_마감이면_APPLY_POST_NOT_OPEN() {
         Post post = SubmissionTestFixtures.openPost();
         post.close(TODAY);
-        assertCode(post, SubmissionErrorCode.APPLY_POST_NOT_OPEN);
+        assertCode(post, ErrorCode.APPLY_POST_NOT_OPEN);
     }
 
     @Test
     void 시작일_전이면_존재를_숨겨_POST_NOT_FOUND() {
         assertCode(SubmissionTestFixtures.post(TODAY.plusDays(1), TODAY.plusDays(5)),
-                SubmissionErrorCode.POST_NOT_FOUND);
+                ErrorCode.POST_NOT_FOUND);
     }
 
     @Test
     void 없는_글이면_POST_NOT_FOUND() {
-        assertCode(null, SubmissionErrorCode.POST_NOT_FOUND);
+        assertCode(null, ErrorCode.POST_NOT_FOUND);
     }
 }

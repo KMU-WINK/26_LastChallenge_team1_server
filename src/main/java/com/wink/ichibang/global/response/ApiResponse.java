@@ -1,4 +1,4 @@
-package com.wink.ichibang.post.dto;
+package com.wink.ichibang.global.response;
 
 /**
  * 성공 응답 껍데기 { "data": ... }.
