@@ -1,7 +1,7 @@
 package com.wink.ichibang.post.service;
 
-import com.wink.ichibang.post.domain.Post;
 import com.wink.ichibang.global.time.TimeZones;
+import com.wink.ichibang.post.domain.Post;
 import com.wink.ichibang.post.domain.PostStatus;
 import com.wink.ichibang.post.domain.PostType;
 import com.wink.ichibang.global.response.PageResponse;
@@ -44,7 +44,6 @@ public class PostService {
     public PostDetailResponse getPost(Long postId, Long memberId) {
         LocalDate today = today();
         Post post = postRepository.findById(postId)
-                .filter(p -> p.isStartedOn(today))
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         SubmissionPort.MySubmission mySubmission = memberId == null ? null
