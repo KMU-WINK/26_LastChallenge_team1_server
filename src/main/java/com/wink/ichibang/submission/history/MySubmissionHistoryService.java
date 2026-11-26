@@ -1,5 +1,6 @@
 package com.wink.ichibang.submission.history;
 
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.post.domain.Post;
 import com.wink.ichibang.post.domain.PostStatus;
 import com.wink.ichibang.post.domain.PostType;
@@ -21,7 +22,7 @@ public class MySubmissionHistoryService {
 
     @Transactional(readOnly = true)
     public MySubmissionHistoryResponse.Page getMine(long memberId, int page, int size) {
-        LocalDate today = LocalDate.now(Post.KST);
+        LocalDate today = LocalDate.now(TimeZones.KST);
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("memberId", memberId)
