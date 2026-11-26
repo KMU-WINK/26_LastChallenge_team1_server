@@ -10,12 +10,12 @@ import com.wink.ichibang.post.repository.PostRepository;
 import com.wink.ichibang.submission.domain.SubmissionStatus;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest.AnswerRequest;
+import com.wink.ichibang.support.MySqlIntegrationTest;
 import com.wink.ichibang.global.exception.ErrorCode;
 import com.wink.ichibang.global.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
@@ -32,17 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 같은 신청서를 동시에 건드리는 요청이 500 없이 한 줄로 처리되는지 확인한다 (SUB-03, 05 + FORM-04).
  *
- * 유니크 제약·외래키·행 잠금(SELECT ... FOR UPDATE)은 MySQL에서만 그대로 재현되므로 실제 MySQL을 쓴다.
- * 개발 DB(ichibang)를 건드리지 않도록 전용 스키마 ichibang_test를 자동으로 만들어 쓰고,
- * 계정·비밀번호는 로컬 설정(application-local.yml)을 따른다. 트랜잭션을 걸지 않는 이유는
- * 요청마다 별도 트랜잭션으로 커밋되어야 경합이 일어나기 때문이다.
+ * 실제 MySQL(전용 스키마 ichibang_test)로 돈다. 설정은 {@link MySqlIntegrationTest} 참고.
+ * 트랜잭션을 걸지 않는 이유는 요청마다 별도 트랜잭션으로 커밋되어야 경합이 일어나기 때문이다.
  */
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:mysql://localhost:3306/ichibang_test"
-                + "?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.show-sql=false"
-})
+@MySqlIntegrationTest
 class SubmissionConcurrencyTest {
 
     private static final long MEMBER_ID = 10L;
@@ -204,6 +197,36 @@ class SubmissionConcurrencyTest {
             String status = jdbc.queryForObject(
                     "SELECT status FROM submission WHERE id = ?", String.class, submissionId);
             assertThat(status).as("round %d: 수정이 참여 완료를 덮어썼다", round).isEqualTo("COMPLETED");
+        }
+    }
+
+    @Test
+    void 참여_완료_처리와_취소가_동시에_와도_500_없이_한쪽만_이긴다() throws Exception {
+        for (int round = 0; round < 40; round++) {
+            long memberId = 200 + round;
+            Long submissionId = submit(memberId);
+
+            List<Object> results = runTogether(List.of(
+                    () -> {
+                        submissionService.cancel(postId, memberId);
+                        return "취소";
+                    },
+                    () -> formService.changeStatus(postId, submissionId, SubmissionStatus.COMPLETED)));
+
+            Object cancel = results.get(0);
+            Object complete = results.get(1);
+            boolean cancelWon = !(cancel instanceof Throwable);
+            if (cancelWon) {
+                // 취소가 먼저: 제출이 사라졌으니 운영진 처리는 "신청 내역 없음"
+                assertThat(isNotFound(complete)).as("round %d 완료 처리: %s", round, complete).isTrue();
+                assertThat(count("SELECT COUNT(*) FROM submission WHERE id = ?", submissionId)).isZero();
+            } else {
+                // 완료 처리가 먼저: 부원은 취소할 수 없고 제출은 완료 상태로 남는다
+                assertThat(isCompleted(cancel)).as("round %d 취소: %s", round, cancel).isTrue();
+                assertThat(complete).as("round %d 완료 처리", round).isNotInstanceOf(Throwable.class);
+                assertThat(jdbc.queryForObject("SELECT status FROM submission WHERE id = ?",
+                        String.class, submissionId)).isEqualTo("COMPLETED");
+            }
         }
     }
 }

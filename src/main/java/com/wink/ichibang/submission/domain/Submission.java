@@ -16,6 +16,7 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -62,6 +63,7 @@ public class Submission {
     private LocalDateTime completedAt;
 
     @OneToMany(mappedBy = "submission", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100) // 제출 여러 건의 답변을 읽을 때 건마다 쿼리를 날리지 않는다 (CSV)
     private List<Answer> answers = new ArrayList<>();
 
     /** 신규 제출 (SUB-01). 상태는 SUBMITTED */
@@ -81,6 +83,24 @@ public class Submission {
         if (status == SubmissionStatus.COMPLETED) {
             throw new BusinessException(ErrorCode.SUBMISSION_COMPLETED);
         }
+    }
+
+    /** 참여 완료 처리 (FORM-04). 이미 완료된 제출이면 409 INVALID_STATUS_TRANSITION */
+    public void complete(LocalDateTime now) {
+        if (status == SubmissionStatus.COMPLETED) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        this.status = SubmissionStatus.COMPLETED;
+        this.completedAt = now;
+    }
+
+    /** 참여 완료를 취소하고 제출됨으로 되돌린다 (FORM-04). 이미 제출됨이면 409 INVALID_STATUS_TRANSITION */
+    public void revert() {
+        if (status == SubmissionStatus.SUBMITTED) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        this.status = SubmissionStatus.SUBMITTED;
+        this.completedAt = null;
     }
 
     /** 기존 답변을 모두 지운다. 새 답변을 붙이기 전에 flush해야 한다 (answer 유니크 제약 때문) */

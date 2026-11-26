@@ -104,6 +104,8 @@ com.wink.ichibang
 
 도메인끼리는 엔티티를 직접 참조하지 않고 **ID로만** 연결합니다. 신청글 도메인은 제출 수와 내 신청 정보를 `post.port.SubmissionPort`로만 묻고, 구현체(`SubmissionPortAdapter`)는 submission 도메인에 있습니다.
 
+form 도메인도 제출·답변 테이블을 SQL로 직접 읽거나 고치지 않습니다. 읽기는 `SubmissionQueryService`, 상태 변경(참여 완료 처리)은 `SubmissionService.changeStatus`를 거치고, 상태 규칙은 `Submission` 엔티티(`complete()`, `revert()`)가 지킵니다.
+
 <br>
 
 ## 🗂 데이터 모델

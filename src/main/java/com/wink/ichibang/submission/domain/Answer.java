@@ -15,6 +15,7 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -45,6 +46,7 @@ public class Answer {
     private String text;
 
     @ElementCollection(fetch = FetchType.LAZY)
+    @BatchSize(size = 100) // 답변 여러 개의 선택지를 한 번에 읽는다
     @CollectionTable(name = "answer_option", joinColumns = @JoinColumn(name = "answer_id"))
     @Column(name = "option_id", nullable = false)
     private Set<Long> optionIds = new LinkedHashSet<>();
