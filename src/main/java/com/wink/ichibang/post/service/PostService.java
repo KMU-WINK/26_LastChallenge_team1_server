@@ -43,7 +43,6 @@ public class PostService {
     public PostDetailResponse getPost(Long postId, Long memberId) {
         LocalDate today = today();
         Post post = postRepository.findById(postId)
-                .filter(p -> p.isStartedOn(today))
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
 
         SubmissionPort.MySubmission mySubmission = memberId == null ? null

@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
  * - DB status는 운영진의 수동 마감(POST-06)만 기록한다.
  * - 화면에 내보내는 상태는 {@link #statusOn(LocalDate)}로 계산한다.
  *   수동 마감했거나 종료일이 지났으면 CLOSED, 아니면 OPEN.
- * - 시작일 전 글은 OPEN이지만 부원에게는 보이지 않는다({@link #isStartedOn(LocalDate)}).
  */
 @Entity
 @Table(name = "post")
@@ -110,11 +109,6 @@ public class Post {
             return PostStatus.CLOSED;
         }
         return PostStatus.OPEN;
-    }
-
-    /** 시작일이 되었는지. 시작 전 글은 부원 목록·상세에서 숨긴다 */
-    public boolean isStartedOn(LocalDate today) {
-        return !today.isBefore(startDate);
     }
 
     /** 모집 중일 때만 종료일까지 남은 일수, 마감이면 null */
