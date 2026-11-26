@@ -2,24 +2,36 @@ app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5174}
 
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
 spring:
-    profiles:
-      active: local              # application-local.yml도 같이 읽기
+  profiles:
+    active: local              # application-local.yml도 같이 읽기
+    group:
+      local: local-seed        # local일 때만 로컬 전용 시드(db/dev)도 적용. application-local-seed.yml 참고
 
-    server:
-      servlet:
-        encoding:
-          charset: UTF-8
-          force: true
+  datasource:
+    url: jdbc:mysql://localhost:3306/ichibang
+    username: root
 
-    datasource:
-      url: jdbc:mysql://localhost:3306/ichibang
-      username: root
+  # 스키마는 Flyway(db/migration)가 만든다. 직접 SQL을 실행하지 말고 새 V{번호}__설명.sql을 추가한다
+  flyway:
+    enabled: true
+    encoding: UTF-8
+    locations: classpath:db/migration
+    # Flyway 도입 전에 ddl-auto: update로 만든 DB(테이블은 있고 이력이 없음)는 V1을 이미 적용한 것으로 보고 이어간다.
+    # 빈 DB는 평소처럼 V1부터 실행한다
+    baseline-on-migrate: true
+    baseline-version: 1
 
-    jpa:
+  jpa:
+    hibernate:
+      ddl-auto: validate       # 엔티티와 스키마가 다르면 시작할 때 실패한다 (스키마를 바꾸는 일은 Flyway만)
+    show-sql: true
+    properties:
       hibernate:
-        ddl-auto: validate
-      show-sql: true
-      properties:
-        hibernate:
-          format_sql: true
+        format_sql: true

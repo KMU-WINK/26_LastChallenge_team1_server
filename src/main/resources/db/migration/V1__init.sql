@@ -3,6 +3,10 @@
 --   post, question, question_option : 신청글·신청서 질문 (POST-01~07, FORM-01)
 --   submission, answer, answer_option: 제출·답변 (SUB-01~05, FORM-02~06)
 --   member(회원)는 기존 테이블을 쓴다. 회원 FK는 테이블 이름이 확정되면 추가한다.
+--   (로컬 개발용 임시 member 테이블과 테스트 회원은 db/dev/R__temp_member.sql)
+--
+-- Flyway가 실행한다. 이미 적용된 파일은 고치지 말고 V2__... 로 새 파일을 추가한다.
+-- 데이터베이스는 연결 설정(spring.datasource.url)이 정하므로 USE를 쓰지 않는다.
 -- =========================================================
 
 -- 신청글
@@ -92,17 +96,3 @@ CREATE TABLE answer_option (
                                    ON DELETE CASCADE,
                                CONSTRAINT fk_answer_option_option FOREIGN KEY (option_id) REFERENCES question_option (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '객관식 답변 선택지';
-
--- 임시 사용자(Member) 테이블
-USE ichibang;
-
-CREATE TABLE member (
-                        id          BIGINT       NOT NULL AUTO_INCREMENT,
-                        name        VARCHAR(50)  NOT NULL,
-                        student_no  VARCHAR(20)  NOT NULL,
-                        PRIMARY KEY (id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-
-INSERT INTO member (id, name, student_no) VALUES
-                                              (1,  '운영진',  '20210001'),
-                                              (10, '김호', '20223067');

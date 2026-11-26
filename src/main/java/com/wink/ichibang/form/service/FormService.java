@@ -52,9 +52,6 @@ public class FormService {
     public MyForm myForm(Long postId, long memberId) {
         LocalDate today = today();
         Post post = findPost(postId);
-        if (!post.isStartedOn(today) || post.statusOn(today) != PostStatus.OPEN) {
-            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
-        }
         if (post.statusOn(today) != PostStatus.OPEN) {
             throw new BusinessException(ErrorCode.APPLY_POST_NOT_OPEN);
         }
