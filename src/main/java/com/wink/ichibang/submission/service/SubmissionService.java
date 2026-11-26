@@ -4,6 +4,8 @@ import com.wink.ichibang.post.domain.Post;
 import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.submission.domain.AnswerDraft;
 import com.wink.ichibang.submission.domain.Submission;
+import com.wink.ichibang.submission.domain.SubmissionStatus;
+import com.wink.ichibang.submission.dto.SubmissionView;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.response.SubmissionCreatedResponse;
 import com.wink.ichibang.submission.dto.response.SubmissionUpdatedResponse;
@@ -87,6 +89,22 @@ public class SubmissionService {
         Submission submission = findMine(postId, memberId);
         submission.requireChangeable();
         submissionRepository.delete(submission);
+    }
+
+    /**
+     * FORM-04 운영진의 참여 완료 처리(COMPLETED)·되돌리기(SUBMITTED). 상태 규칙은 Submission이 지킨다.
+     * 제출 행을 잠그고 읽으므로 같은 제출을 동시에 처리하면 한 번만 성공하고 나머지는 409가 된다.
+     * (잠금 읽기는 항상 최신 커밋을 읽어서 격리 수준을 따로 정하지 않아도 된다)
+     */
+    public SubmissionView changeStatus(Long postId, Long submissionId, SubmissionStatus target) {
+        Submission submission = submissionRepository.findForUpdateByIdAndPostId(submissionId, postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBMISSION_NOT_FOUND));
+        if (target == SubmissionStatus.COMPLETED) {
+            submission.complete(now());
+        } else {
+            submission.revert();
+        }
+        return SubmissionView.withoutAnswers(submission);
     }
 
     private static boolean violatesUniquePostMember(DataIntegrityViolationException e) {
