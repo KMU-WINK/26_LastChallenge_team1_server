@@ -90,9 +90,13 @@
 
 ```
 com.wink.ichibang
+├── global        # 모든 도메인이 함께 쓰는 공통 코드
+│   ├── exception # ErrorCode · BusinessException · GlobalExceptionHandler · ErrorResponse
+│   ├── response  # ApiResponse · PageResponse
+│   └── time      # TimeZones (KST)
 ├── auth          # 로그인한 부원·운영진 확인 (현재는 임시 헤더 방식)
 ├── post          # 신청글 + 신청서 질문 (POST-01~07, FORM-01)
-│   ├── controller · service · repository · domain · dto · exception
+│   ├── controller · service · repository · domain · dto
 │   └── port      # 제출 도메인에 묻는 창구 (SubmissionPort)
 ├── submission    # 신청서 제출·수정·취소 (SUB-01~03, 05)
 └── form          # 신청서 조회, 제출자 관리 (FORM-02~06)
@@ -351,5 +355,5 @@ Content-Type: application/json
 - [ ] COM-01 로그인 연동 (기존 로그인 방식 확인 후 임시 헤더 인증 교체)
 - [ ] SUB-04 MY 신청 목록 `GET /api/submissions/me`
 - [ ] 임시 `member` 테이블을 로그인 담당의 회원 테이블로 교체
-- [ ] 공통 응답·오류 처리(global) 패키지로 도메인별 예외 핸들러 통합
+- [x] 공통 응답·오류 처리(global) 패키지로 도메인별 예외 핸들러 통합
 - [ ] 명세의 "확인 필요" 항목 확정 (구분 변경 허용 여부, 단답·서술 글자 수 제한 등)

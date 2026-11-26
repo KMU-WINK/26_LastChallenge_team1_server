@@ -1,7 +1,7 @@
 package com.wink.ichibang.submission.controller;
 
 import com.wink.ichibang.auth.CurrentMember;
-import com.wink.ichibang.post.dto.ApiResponse;
+import com.wink.ichibang.global.response.ApiResponse;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.response.SubmissionCreatedResponse;
 import com.wink.ichibang.submission.dto.response.SubmissionUpdatedResponse;

@@ -7,7 +7,7 @@ import com.wink.ichibang.form.dto.FormResponses.StatusChangeResponse;
 import com.wink.ichibang.form.dto.FormResponses.SubmissionDetail;
 import com.wink.ichibang.form.service.FormService;
 import com.wink.ichibang.form.service.FormService.CsvFile;
-import com.wink.ichibang.post.dto.ApiResponse;
+import com.wink.ichibang.global.response.ApiResponse;
 import com.wink.ichibang.submission.domain.SubmissionStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;

@@ -1,10 +1,11 @@
 package com.wink.ichibang.submission.service;
 
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.post.domain.PostStatus;
 import com.wink.ichibang.post.repository.PostRepository;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,16 +25,16 @@ public class ApplyPolicy {
 
     /**
      * @return 신청할 수 있는 글
-     * @throws SubmissionException 없거나 삭제되거나 시작 전인 글은 POST_NOT_FOUND(404),
+     * @throws BusinessException 없거나 삭제되거나 시작 전인 글은 POST_NOT_FOUND(404),
      *                             마감된 글(수동·종료일 경과)은 APPLY_POST_NOT_OPEN(400)
      */
     public Post requireApplicable(Long postId) {
-        LocalDate today = LocalDate.now(Post.KST);
+        LocalDate today = LocalDate.now(TimeZones.KST);
         Post post = postRepository.findById(postId)
                 .filter(p -> p.isStartedOn(today))
-                .orElseThrow(() -> new SubmissionException(SubmissionErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
         if (post.statusOn(today) != PostStatus.OPEN) {
-            throw new SubmissionException(SubmissionErrorCode.APPLY_POST_NOT_OPEN);
+            throw new BusinessException(ErrorCode.APPLY_POST_NOT_OPEN);
         }
         return post;
     }

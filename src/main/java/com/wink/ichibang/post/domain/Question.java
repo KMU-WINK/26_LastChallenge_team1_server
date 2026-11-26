@@ -1,6 +1,7 @@
 package com.wink.ichibang.post.domain;
 
-import com.wink.ichibang.post.exception.PostException;
+import com.wink.ichibang.global.exception.BusinessException;
+import com.wink.ichibang.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -82,7 +83,7 @@ public class Question {
                 continue;
             }
             if (!existing.containsKey(id) || !keepIds.add(id)) {
-                throw PostException.field(
+                throw BusinessException.field(ErrorCode.VALIDATION_FAILED,
                         "questions[" + questionIndex + "].options[" + i + "].id", "이 질문의 선택지가 아니에요");
             }
         }

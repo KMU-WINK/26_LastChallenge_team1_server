@@ -3,8 +3,8 @@ package com.wink.ichibang.submission.service;
 import com.wink.ichibang.post.domain.Post;
 import com.wink.ichibang.submission.domain.AnswerDraft;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest.AnswerRequest;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -31,8 +31,8 @@ class AnswerValidatorTest {
 
     private void assertInvalid(List<AnswerRequest> requests) {
         assertThatThrownBy(() -> validator.validate(post, requests))
-                .isInstanceOfSatisfying(SubmissionException.class, e -> {
-                    assertThat(e.getErrorCode()).isEqualTo(SubmissionErrorCode.INVALID_ANSWER);
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ANSWER);
                     assertThat(e.getFieldErrors()).isNotEmpty();
                 });
     }

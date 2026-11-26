@@ -1,13 +1,14 @@
 package com.wink.ichibang.submission.service;
 
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.submission.domain.AnswerDraft;
 import com.wink.ichibang.submission.domain.Submission;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.response.SubmissionCreatedResponse;
 import com.wink.ichibang.submission.dto.response.SubmissionUpdatedResponse;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import com.wink.ichibang.submission.repository.SubmissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,7 +41,7 @@ public class SubmissionService {
         Post post = applyPolicy.requireApplicable(postId);
 
         if (submissionRepository.existsByPostIdAndMemberId(postId, memberId)) {
-            throw new SubmissionException(SubmissionErrorCode.DUPLICATE_SUBMISSION);
+            throw new BusinessException(ErrorCode.DUPLICATE_SUBMISSION);
         }
         List<AnswerDraft> drafts = answerValidator.validate(post, request.answersOrEmpty());
 
@@ -53,7 +54,7 @@ public class SubmissionService {
             if (!violatesUniquePostMember(e)) {
                 throw e;
             }
-            throw new SubmissionException(SubmissionErrorCode.DUPLICATE_SUBMISSION);
+            throw new BusinessException(ErrorCode.DUPLICATE_SUBMISSION);
         }
         return SubmissionCreatedResponse.of(submission);
     }
@@ -100,11 +101,11 @@ public class SubmissionService {
     /** 수정·취소 전용. 행을 잠가서 같은 신청서를 동시에 바꾸거나 운영진 처리와 겹치는 것을 막는다 */
     private Submission findMine(Long postId, Long memberId) {
         return submissionRepository.findForUpdateByPostIdAndMemberId(postId, memberId)
-                .orElseThrow(() -> new SubmissionException(SubmissionErrorCode.SUBMISSION_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBMISSION_NOT_FOUND));
     }
 
     /** 명세 예시처럼 초 단위로 다룬다 */
     private LocalDateTime now() {
-        return LocalDateTime.now(Post.KST).truncatedTo(ChronoUnit.SECONDS);
+        return LocalDateTime.now(TimeZones.KST).truncatedTo(ChronoUnit.SECONDS);
     }
 }
