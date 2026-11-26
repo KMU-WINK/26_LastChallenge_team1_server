@@ -1,7 +1,7 @@
 package com.wink.ichibang.submission.domain;
 
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -79,7 +79,7 @@ public class Submission {
     /** 참여 완료된 제출은 부원이 수정·취소할 수 없다 → 409 SUBMISSION_COMPLETED */
     public void requireChangeable() {
         if (status == SubmissionStatus.COMPLETED) {
-            throw new SubmissionException(SubmissionErrorCode.SUBMISSION_COMPLETED);
+            throw new BusinessException(ErrorCode.SUBMISSION_COMPLETED);
         }
     }
 

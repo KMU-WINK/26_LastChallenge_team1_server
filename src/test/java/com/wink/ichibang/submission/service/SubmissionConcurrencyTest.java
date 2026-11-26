@@ -1,6 +1,7 @@
 package com.wink.ichibang.submission.service;
 
 import com.wink.ichibang.form.service.FormService;
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.post.domain.Post;
 import com.wink.ichibang.post.domain.PostType;
 import com.wink.ichibang.post.domain.QuestionDraft;
@@ -9,8 +10,8 @@ import com.wink.ichibang.post.repository.PostRepository;
 import com.wink.ichibang.submission.domain.SubmissionStatus;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest.AnswerRequest;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,7 +65,7 @@ class SubmissionConcurrencyTest {
         for (String table : List.of("answer_option", "answer", "submission", "question_option", "question", "post")) {
             jdbc.update("DELETE FROM " + table);
         }
-        LocalDate today = LocalDate.now(Post.KST);
+        LocalDate today = LocalDate.now(TimeZones.KST);
         Post post = postRepository.save(Post.create(PostType.STUDY, "동시성 점검", null, "본문",
                 today.minusDays(1), today.plusDays(7), 1L,
                 List.of(new QuestionDraft(null, "단답", null, QuestionType.SHORT, List.of()))));
@@ -111,18 +112,18 @@ class SubmissionConcurrencyTest {
     }
 
     private static boolean isNotFound(Object result) {
-        return result instanceof SubmissionException e
-                && e.getErrorCode() == SubmissionErrorCode.SUBMISSION_NOT_FOUND;
+        return result instanceof BusinessException e
+                && e.getErrorCode() == ErrorCode.SUBMISSION_NOT_FOUND;
     }
 
     private static boolean isDuplicate(Object result) {
-        return result instanceof SubmissionException e
-                && e.getErrorCode() == SubmissionErrorCode.DUPLICATE_SUBMISSION;
+        return result instanceof BusinessException e
+                && e.getErrorCode() == ErrorCode.DUPLICATE_SUBMISSION;
     }
 
     private static boolean isCompleted(Object result) {
-        return result instanceof SubmissionException e
-                && e.getErrorCode() == SubmissionErrorCode.SUBMISSION_COMPLETED;
+        return result instanceof BusinessException e
+                && e.getErrorCode() == ErrorCode.SUBMISSION_COMPLETED;
     }
 
     private long count(String sql, Object... args) {

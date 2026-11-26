@@ -1,13 +1,14 @@
 package com.wink.ichibang.post.service;
 
 import com.wink.ichibang.post.domain.Post;
+import com.wink.ichibang.global.time.TimeZones;
 import com.wink.ichibang.post.domain.PostStatus;
 import com.wink.ichibang.post.domain.PostType;
-import com.wink.ichibang.post.dto.response.PageResponse;
+import com.wink.ichibang.global.response.PageResponse;
 import com.wink.ichibang.post.dto.response.PostDetailResponse;
 import com.wink.ichibang.post.dto.response.PostListItemResponse;
-import com.wink.ichibang.post.exception.PostErrorCode;
-import com.wink.ichibang.post.exception.PostException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import com.wink.ichibang.post.port.SubmissionPort;
 import com.wink.ichibang.post.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ public class PostService {
         LocalDate today = today();
         Post post = postRepository.findById(postId)
                 .filter(p -> p.isStartedOn(today))
-                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         SubmissionPort.MySubmission mySubmission = memberId == null ? null
                 : submissionPort.findMySubmission(postId, memberId).orElse(null);
@@ -56,6 +57,6 @@ public class PostService {
     }
 
     static LocalDate today() {
-        return LocalDate.now(Post.KST);
+        return LocalDate.now(TimeZones.KST);
     }
 }

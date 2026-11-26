@@ -1,4 +1,4 @@
-package com.wink.ichibang.post.dto.response;
+package com.wink.ichibang.global.response;
 
 import org.springframework.data.domain.Page;
 

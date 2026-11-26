@@ -6,9 +6,9 @@ import com.wink.ichibang.post.domain.QuestionType;
 import com.wink.ichibang.post.dto.request.PostCreateRequest.QuestionCreateRequest;
 import com.wink.ichibang.post.dto.request.PostUpdateRequest.OptionUpdateRequest;
 import com.wink.ichibang.post.dto.request.PostUpdateRequest.QuestionUpdateRequest;
-import com.wink.ichibang.post.exception.FieldErrorResponse;
-import com.wink.ichibang.post.exception.PostErrorCode;
-import com.wink.ichibang.post.exception.PostException;
+import com.wink.ichibang.global.exception.FieldErrorResponse;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +75,7 @@ final class QuestionDraftMapper {
 
     private static void throwIfAny(List<FieldErrorResponse> errors) {
         if (!errors.isEmpty()) {
-            throw new PostException(PostErrorCode.VALIDATION_FAILED, errors);
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, errors);
         }
     }
 

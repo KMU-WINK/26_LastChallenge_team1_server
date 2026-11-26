@@ -3,7 +3,7 @@ package com.wink.ichibang.form.controller;
 import com.wink.ichibang.auth.CurrentMember;
 import com.wink.ichibang.form.dto.FormResponses.MyForm;
 import com.wink.ichibang.form.service.FormService;
-import com.wink.ichibang.post.dto.ApiResponse;
+import com.wink.ichibang.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

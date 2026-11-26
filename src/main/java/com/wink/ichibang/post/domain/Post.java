@@ -1,7 +1,8 @@
 package com.wink.ichibang.post.domain;
 
-import com.wink.ichibang.post.exception.PostErrorCode;
-import com.wink.ichibang.post.exception.PostException;
+import com.wink.ichibang.global.exception.BusinessException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.time.TimeZones;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -12,7 +13,6 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
@@ -33,8 +33,6 @@ import java.util.stream.Collectors;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post {
-
-    public static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -130,7 +128,7 @@ public class Post {
     /** 마감된 글이면 409 POST_CLOSED */
     public void requireOpen(LocalDate today) {
         if (statusOn(today) == PostStatus.CLOSED) {
-            throw new PostException(PostErrorCode.POST_CLOSED);
+            throw new BusinessException(ErrorCode.POST_CLOSED);
         }
     }
 
@@ -172,7 +170,7 @@ public class Post {
                 continue;
             }
             if (!existing.containsKey(id) || !keepIds.add(id)) {
-                throw PostException.field("questions[" + i + "].id", "이 신청글의 질문이 아니에요");
+                throw BusinessException.field(ErrorCode.VALIDATION_FAILED, "questions[" + i + "].id", "이 신청글의 질문이 아니에요");
             }
         }
 
@@ -200,26 +198,26 @@ public class Post {
     // ===== 삭제 (POST-03) =====
 
     public void softDelete() {
-        this.deletedAt = LocalDateTime.now(KST);
+        this.deletedAt = LocalDateTime.now(TimeZones.KST);
     }
 
     // ===== 공통 =====
 
     private static void validatePeriod(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
-            throw new PostException(PostErrorCode.INVALID_PERIOD);
+            throw new BusinessException(ErrorCode.INVALID_PERIOD);
         }
     }
 
     @PrePersist
     void onCreate() {
-        LocalDateTime now = LocalDateTime.now(KST);
+        LocalDateTime now = LocalDateTime.now(TimeZones.KST);
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
-        this.updatedAt = LocalDateTime.now(KST);
+        this.updatedAt = LocalDateTime.now(TimeZones.KST);
     }
 }

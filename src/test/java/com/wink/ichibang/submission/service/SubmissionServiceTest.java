@@ -8,8 +8,8 @@ import com.wink.ichibang.submission.dto.request.SubmissionRequest;
 import com.wink.ichibang.submission.dto.request.SubmissionRequest.AnswerRequest;
 import com.wink.ichibang.submission.dto.response.SubmissionCreatedResponse;
 import com.wink.ichibang.submission.dto.response.SubmissionUpdatedResponse;
-import com.wink.ichibang.submission.exception.SubmissionErrorCode;
-import com.wink.ichibang.submission.exception.SubmissionException;
+import com.wink.ichibang.global.exception.ErrorCode;
+import com.wink.ichibang.global.exception.BusinessException;
 import com.wink.ichibang.submission.repository.SubmissionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,9 +60,9 @@ class SubmissionServiceTest {
         return new AnswerRequest(SubmissionTestFixtures.SHORT_Q, null, text);
     }
 
-    private void assertCode(Runnable action, SubmissionErrorCode expected) {
+    private void assertCode(Runnable action, ErrorCode expected) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(SubmissionException.class,
+                .isInstanceOfSatisfying(BusinessException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(expected));
     }
 
@@ -109,9 +109,9 @@ class SubmissionServiceTest {
     @Test
     void 모집_중이_아니면_저장하지_않는다() {
         when(applyPolicy.requireApplicable(POST_ID))
-                .thenThrow(new SubmissionException(SubmissionErrorCode.APPLY_POST_NOT_OPEN));
+                .thenThrow(new BusinessException(ErrorCode.APPLY_POST_NOT_OPEN));
 
-        assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.APPLY_POST_NOT_OPEN);
+        assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), ErrorCode.APPLY_POST_NOT_OPEN);
         verify(submissionRepository, never()).saveAndFlush(any());
     }
 
@@ -120,7 +120,7 @@ class SubmissionServiceTest {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
         when(submissionRepository.existsByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(true);
 
-        assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.DUPLICATE_SUBMISSION);
+        assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), ErrorCode.DUPLICATE_SUBMISSION);
         verify(submissionRepository, never()).saveAndFlush(any());
     }
 
@@ -132,7 +132,7 @@ class SubmissionServiceTest {
                 "could not execute statement",
                 new RuntimeException("Duplicate entry '100-7' for key 'submission.uk_submission_post_member'")));
 
-        assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.DUPLICATE_SUBMISSION);
+        assertCode(() -> service.submit(POST_ID, MEMBER_ID, request()), ErrorCode.DUPLICATE_SUBMISSION);
     }
 
     @Test
@@ -151,7 +151,7 @@ class SubmissionServiceTest {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
 
         assertCode(() -> service.submit(POST_ID, MEMBER_ID,
-                request(new AnswerRequest(999L, null, "x"))), SubmissionErrorCode.INVALID_ANSWER);
+                request(new AnswerRequest(999L, null, "x"))), ErrorCode.INVALID_ANSWER);
         verify(submissionRepository, never()).saveAndFlush(any());
     }
 
@@ -184,7 +184,7 @@ class SubmissionServiceTest {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
         when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.empty());
 
-        assertCode(() -> service.update(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.SUBMISSION_NOT_FOUND);
+        assertCode(() -> service.update(POST_ID, MEMBER_ID, request()), ErrorCode.SUBMISSION_NOT_FOUND);
     }
 
     @Test
@@ -194,7 +194,7 @@ class SubmissionServiceTest {
         when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
         assertCode(() -> service.update(POST_ID, MEMBER_ID, request(shortAnswer("새 답"))),
-                SubmissionErrorCode.SUBMISSION_COMPLETED);
+                ErrorCode.SUBMISSION_COMPLETED);
         assertThat(submission.getAnswers().get(0).getText()).isEqualTo("이전 답");
     }
 
@@ -205,16 +205,16 @@ class SubmissionServiceTest {
         when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
         assertCode(() -> service.update(POST_ID, MEMBER_ID, request(new AnswerRequest(999L, null, "x"))),
-                SubmissionErrorCode.INVALID_ANSWER);
+                ErrorCode.INVALID_ANSWER);
         assertThat(submission.getAnswers()).hasSize(1);
     }
 
     @Test
     void 수정은_모집_중이_아니면_막힌다() {
         when(applyPolicy.requireApplicable(POST_ID))
-                .thenThrow(new SubmissionException(SubmissionErrorCode.APPLY_POST_NOT_OPEN));
+                .thenThrow(new BusinessException(ErrorCode.APPLY_POST_NOT_OPEN));
 
-        assertCode(() -> service.update(POST_ID, MEMBER_ID, request()), SubmissionErrorCode.APPLY_POST_NOT_OPEN);
+        assertCode(() -> service.update(POST_ID, MEMBER_ID, request()), ErrorCode.APPLY_POST_NOT_OPEN);
         verify(submissionRepository, never()).findForUpdateByPostIdAndMemberId(any(), any());
     }
 
@@ -236,7 +236,7 @@ class SubmissionServiceTest {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
         when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.empty());
 
-        assertCode(() -> service.cancel(POST_ID, MEMBER_ID), SubmissionErrorCode.SUBMISSION_NOT_FOUND);
+        assertCode(() -> service.cancel(POST_ID, MEMBER_ID), ErrorCode.SUBMISSION_NOT_FOUND);
     }
 
     @Test
@@ -245,15 +245,15 @@ class SubmissionServiceTest {
         when(applyPolicy.requireApplicable(POST_ID)).thenReturn(post);
         when(submissionRepository.findForUpdateByPostIdAndMemberId(POST_ID, MEMBER_ID)).thenReturn(Optional.of(submission));
 
-        assertCode(() -> service.cancel(POST_ID, MEMBER_ID), SubmissionErrorCode.SUBMISSION_COMPLETED);
+        assertCode(() -> service.cancel(POST_ID, MEMBER_ID), ErrorCode.SUBMISSION_COMPLETED);
         verify(submissionRepository, never()).delete(any(Submission.class));
     }
 
     @Test
     void 취소는_모집_중이_아니면_막힌다() {
         when(applyPolicy.requireApplicable(POST_ID))
-                .thenThrow(new SubmissionException(SubmissionErrorCode.APPLY_POST_NOT_OPEN));
+                .thenThrow(new BusinessException(ErrorCode.APPLY_POST_NOT_OPEN));
 
-        assertCode(() -> service.cancel(POST_ID, MEMBER_ID), SubmissionErrorCode.APPLY_POST_NOT_OPEN);
+        assertCode(() -> service.cancel(POST_ID, MEMBER_ID), ErrorCode.APPLY_POST_NOT_OPEN);
     }
 }

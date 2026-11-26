@@ -1,8 +1,9 @@
 package com.wink.ichibang.auth;
 
+import com.wink.ichibang.global.exception.BusinessException;
+import com.wink.ichibang.global.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -40,12 +41,12 @@ public class CurrentMember {
     public long requireAdminId() {
         long id = requireId();
         if (!"ADMIN".equalsIgnoreCase(request.getHeader(ROLE_HEADER))) {
-            throw new AccessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "권한이 없어요");
+            throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         return id;
     }
 
-    private static AccessException unauthorized() {
-        return new AccessException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요해요, 다시 로그인해주세요");
+    private static BusinessException unauthorized() {
+        return new BusinessException(ErrorCode.UNAUTHORIZED);
     }
 }
