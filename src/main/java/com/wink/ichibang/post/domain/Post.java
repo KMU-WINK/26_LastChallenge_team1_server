@@ -109,6 +109,11 @@ public class Post {
         return PostStatus.OPEN;
     }
 
+    /** 시작일이 되었는지. 시작 전 글은 신청서 조회·제출을 막는다 */
+    public boolean isStartedOn(LocalDate today) {
+        return !today.isBefore(startDate);
+    }
+
     /** 모집 중일 때만 종료일까지 남은 일수, 마감이면 null */
     public Integer dDayOn(LocalDate today) {
         if (statusOn(today) == PostStatus.CLOSED) {

@@ -21,8 +21,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     /** POST-04 부원 목록: 시작일이 된 글만. recruiting=true면 모집 중만 */
     @Query("""
             select p from Post p
-              and (:type is null or p.type = :type)
-              and (:recruiting = false or (p.status = :open and p.endDate >= :today))
+              where (:type is null or p.type = :type)
+              and (:recruiting = false or (p.status = :open and p.endDate >= :today and p.endDate >= :today))
             """)
     Page<Post> findForMember(@Param("today") LocalDate today,
                              @Param("type") PostType type,
